@@ -15,8 +15,11 @@ RUN apt-get update && apt-get install -y \
 COPY pyproject.toml .
 COPY src/ src/
 
+# Force cache invalidation for pip install - v3
+ARG PIP_CACHEBUST=3
+
 # Install TruthGit with cloud dependencies (Vertex AI, Anthropic, OpenAI)
-RUN pip install --no-cache-dir -e ".[cloud]" google-cloud-aiplatform
+RUN echo "Cache bust: ${PIP_CACHEBUST}" && pip install --no-cache-dir -e ".[cloud]" google-cloud-aiplatform
 
 # Create .truth directory for repository
 RUN mkdir -p /app/.truth
