@@ -12,18 +12,14 @@ RUN apt-get update && apt-get install -y \
 COPY pyproject.toml .
 COPY src/ src/
 
-# Install TruthGit with local dependencies
-RUN pip install --no-cache-dir -e ".[local]"
+# Install TruthGit with cloud dependencies (Vertex AI, Anthropic, OpenAI)
+RUN pip install --no-cache-dir -e ".[cloud]" google-cloud-aiplatform
 
 # Create .truth directory for repository
 RUN mkdir -p /app/.truth
 
-# Expose port
+# Expose port (Railway uses $PORT)
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
-
-# Run the API server
-CMD ["uvicorn", "truthgit.api.server:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the API server - Railway provides $PORT
+CMD uvicorn truthgit.api.server:app --host 0.0.0.0 --port ${PORT:-8000}
