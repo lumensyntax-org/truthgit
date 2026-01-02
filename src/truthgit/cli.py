@@ -9,16 +9,15 @@ Usage:
     truthgit status                  Show repository status
 """
 
+
 import typer
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich import print as rprint
-from typing import Optional
-from pathlib import Path
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 from . import TruthRepository, __version__
-from .objects import ObjectType, ClaimState
+from .objects import ObjectType
 
 app = typer.Typer(
     name="truthgit",
@@ -281,7 +280,7 @@ def validators(
     local: bool = typer.Option(False, "--local", "-l", help="Show only local"),
 ):
     """Show available validators."""
-    from .validators import OllamaValidator, ClaudeValidator, GPTValidator, GeminiValidator
+    from .validators import ClaudeValidator, GeminiValidator, GPTValidator, OllamaValidator
 
     table = Table(title="Available Validators")
     table.add_column("Name")

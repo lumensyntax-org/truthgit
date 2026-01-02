@@ -7,15 +7,14 @@ Context    → Árbol de claims relacionados
 Verification → Snapshot de verdad verificada (commit)
 """
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
-import json
+from typing import Any
 
-from .hashing import content_hash, canonical_serialize
-
+from .hashing import content_hash
 
 # === Enums ===
 
@@ -79,12 +78,12 @@ class TruthObject(ABC):
         pass
 
     @abstractmethod
-    def to_canonical(self) -> Dict[str, Any]:
+    def to_canonical(self) -> dict[str, Any]:
         """Convertir a diccionario canónico para hashing."""
         pass
 
     @abstractmethod
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convertir a diccionario completo para serialización."""
         pass
 
@@ -154,7 +153,7 @@ class Axiom(TruthObject):
     authority_reference: str = ""
     established_date: str = ""
     language: str = "es"
-    aliases: List[str] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     created_by: str = "SYSTEM"
 
@@ -166,7 +165,7 @@ class Axiom(TruthObject):
     def confidence(self) -> float:
         return 1.0  # Axiomas siempre tienen confianza 1.0
 
-    def to_canonical(self) -> Dict[str, Any]:
+    def to_canonical(self) -> dict[str, Any]:
         return {
             "type": "axiom",
             "content": self.content,
@@ -175,7 +174,7 @@ class Axiom(TruthObject):
             "authority_source": self.authority_source,
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "content": self.content,
             "axiom_type": self.axiom_type.value,
@@ -195,7 +194,7 @@ class Axiom(TruthObject):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Axiom":
+    def from_dict(cls, data: dict) -> "Axiom":
         authority = data.get("authority", {})
         metadata = data.get("metadata", {})
         return cls(
@@ -245,15 +244,15 @@ class Claim(TruthObject):
     confidence: float
     category: ClaimCategory
     domain: str
-    sources: List[Source] = field(default_factory=list)
-    verified_by: List[VerifierRecord] = field(default_factory=list)
-    supports: List[str] = field(default_factory=list)  # hashes
-    contradicts: List[str] = field(default_factory=list)
-    requires: List[str] = field(default_factory=list)
-    supersedes: Optional[str] = None  # hash of previous version
+    sources: list[Source] = field(default_factory=list)
+    verified_by: list[VerifierRecord] = field(default_factory=list)
+    supports: list[str] = field(default_factory=list)  # hashes
+    contradicts: list[str] = field(default_factory=list)
+    requires: list[str] = field(default_factory=list)
+    supersedes: str | None = None  # hash of previous version
     state: ClaimState = ClaimState.DRAFT
     language: str = "es"
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     created_by: str = ""
 
@@ -261,7 +260,7 @@ class Claim(TruthObject):
     def object_type(self) -> ObjectType:
         return ObjectType.CLAIM
 
-    def to_canonical(self) -> Dict[str, Any]:
+    def to_canonical(self) -> dict[str, Any]:
         return {
             "type": "claim",
             "content": self.content,
@@ -269,7 +268,7 @@ class Claim(TruthObject):
             "sources": sorted([s.url for s in self.sources]),
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "content": self.content,
             "confidence": self.confidence,
@@ -310,7 +309,7 @@ class Claim(TruthObject):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Claim":
+    def from_dict(cls, data: dict) -> "Claim":
         sources = [
             Source(
                 url=s["url"],
@@ -402,10 +401,10 @@ class Context(TruthObject):
     name: str
     domain: str
     description: str = ""
-    axioms: List[str] = field(default_factory=list)  # hashes
-    claims: List[ClaimRef] = field(default_factory=list)
-    subcontexts: List[ContextRef] = field(default_factory=list)
-    relations: List[Relation] = field(default_factory=list)
+    axioms: list[str] = field(default_factory=list)  # hashes
+    claims: list[ClaimRef] = field(default_factory=list)
+    subcontexts: list[ContextRef] = field(default_factory=list)
+    relations: list[Relation] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     created_by: str = ""
 
@@ -413,7 +412,7 @@ class Context(TruthObject):
     def object_type(self) -> ObjectType:
         return ObjectType.CONTEXT
 
-    def to_canonical(self) -> Dict[str, Any]:
+    def to_canonical(self) -> dict[str, Any]:
         return {
             "type": "context",
             "domain": self.domain,
@@ -422,7 +421,7 @@ class Context(TruthObject):
             "subcontexts": sorted([s.hash for s in self.subcontexts]),
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "domain": self.domain,
@@ -445,7 +444,7 @@ class Context(TruthObject):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Context":
+    def from_dict(cls, data: dict) -> "Context":
         claims = [
             ClaimRef(hash=c["hash"], role=c.get("role", "PRIMARY"))
             for c in data.get("claims", [])
@@ -482,7 +481,7 @@ class Context(TruthObject):
 @dataclass
 class VerifierVote:
     """Voto de un verificador en una verification."""
-    roles: List[str]
+    roles: list[str]
     confidence: float
     reasoning: str
     claims_reviewed: int = 0
@@ -498,7 +497,7 @@ class ConsensusResult:
     value: float
     threshold: float
     passed: bool
-    weights: Dict[str, float] = field(default_factory=dict)
+    weights: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -514,8 +513,8 @@ class Verification(TruthObject):
     """
 
     context_hash: str
-    parent_hash: Optional[str]
-    verifiers: Dict[str, VerifierVote]
+    parent_hash: str | None
+    verifiers: dict[str, VerifierVote]
     consensus: ConsensusResult
     trigger: str = "manual"  # manual, scheduled, pr_review
     session_id: str = ""
@@ -526,7 +525,7 @@ class Verification(TruthObject):
     def object_type(self) -> ObjectType:
         return ObjectType.VERIFICATION
 
-    def to_canonical(self) -> Dict[str, Any]:
+    def to_canonical(self) -> dict[str, Any]:
         return {
             "type": "verification",
             "context": self.context_hash,
@@ -538,7 +537,7 @@ class Verification(TruthObject):
             "timestamp": self.timestamp,
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "context": self.context_hash,
             "parent": self.parent_hash,
@@ -570,7 +569,7 @@ class Verification(TruthObject):
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Verification":
+    def from_dict(cls, data: dict) -> "Verification":
         verifiers = {
             k: VerifierVote(
                 roles=v.get("roles", []),
@@ -610,9 +609,9 @@ class Verification(TruthObject):
 # === Factory Functions ===
 
 def calculate_consensus(
-    verifier_confidences: Dict[str, float],
+    verifier_confidences: dict[str, float],
     threshold: float = 0.66,
-    weights: Optional[Dict[str, float]] = None,
+    weights: dict[str, float] | None = None,
 ) -> ConsensusResult:
     """
     Calcular consenso a partir de confidencias de verificadores.

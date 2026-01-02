@@ -5,20 +5,18 @@ Similar a .git/, almacena todos los objetos y referencias.
 """
 
 import json
-import os
 import shutil
 import zlib
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Tuple, Type, TypeVar
+from typing import TypeVar
 
-from .hashing import content_hash, hash_to_path, path_to_hash
+from .hashing import hash_to_path, path_to_hash
 from .objects import (
     Axiom,
     Claim,
     ClaimRef,
-    ConsensusResult,
-    ConsensusType,
     Context,
     ObjectType,
     TruthObject,
@@ -87,7 +85,7 @@ class TruthRepository:
         (self.refs_dir / "anchors").mkdir(parents=True)
 
         # Crear HEAD (apunta a consensus/main por defecto)
-        self.head_file.write_text("ref: refs/consensus/main\n")
+        self.head_file.write_text("ref: consensus/main\n")
 
         # Crear index vacío
         self._write_index({"staged": [], "timestamp": datetime.now().isoformat()})
@@ -137,7 +135,7 @@ class TruthRepository:
 
         return obj_hash
 
-    def load(self, obj_type: ObjectType, obj_hash: str) -> Optional[TruthObject]:
+    def load(self, obj_type: ObjectType, obj_hash: str) -> TruthObject | None:
         """
         Cargar un objeto del repositorio.
 
@@ -169,13 +167,13 @@ class TruthRepository:
 
     # === Index (Staging Area) ===
 
-    def _read_index(self) -> Dict:
+    def _read_index(self) -> dict:
         """Leer el index."""
         if not self.index_file.exists():
             return {"staged": [], "timestamp": None}
         return json.loads(self.index_file.read_text())
 
-    def _write_index(self, index: Dict):
+    def _write_index(self, index: dict):
         """Escribir el index."""
         self.index_file.write_text(json.dumps(index, indent=2))
 
@@ -215,7 +213,7 @@ class TruthRepository:
             return True
         return False
 
-    def get_staged(self) -> List[Dict]:
+    def get_staged(self) -> list[dict]:
         """Obtener objetos en staging."""
         return self._read_index()["staged"]
 
@@ -235,7 +233,7 @@ class TruthRepository:
         ref_path.parent.mkdir(parents=True, exist_ok=True)
         ref_path.write_text(obj_hash + "\n")
 
-    def get_ref(self, ref_name: str) -> Optional[str]:
+    def get_ref(self, ref_name: str) -> str | None:
         """Obtener el hash de una referencia."""
         ref_path = self._ref_path(ref_name)
         if not ref_path.exists():
@@ -250,7 +248,7 @@ class TruthRepository:
             return True
         return False
 
-    def list_refs(self, prefix: str = "") -> List[Tuple[str, str]]:
+    def list_refs(self, prefix: str = "") -> list[tuple[str, str]]:
         """Listar referencias con su hash."""
         refs = []
         search_dir = self.refs_dir / prefix if prefix else self.refs_dir
@@ -268,7 +266,7 @@ class TruthRepository:
 
     # === HEAD ===
 
-    def get_head(self) -> Optional[str]:
+    def get_head(self) -> str | None:
         """Obtener el hash al que apunta HEAD."""
         if not self.head_file.exists():
             return None
@@ -301,7 +299,7 @@ class TruthRepository:
     def claim(
         self,
         content: str,
-        sources: List[Dict] = None,
+        sources: list[dict] = None,
         confidence: float = 0.5,
         domain: str = "general",
         category: str = "factual",
@@ -358,10 +356,10 @@ class TruthRepository:
 
     def verify(
         self,
-        verifier_results: Dict[str, Tuple[float, str]],
+        verifier_results: dict[str, tuple[float, str]],
         trigger: str = "manual",
         session_id: str = "",
-    ) -> Optional[Verification]:
+    ) -> Verification | None:
         """
         Verificar los claims stageados y crear un commit.
 
@@ -445,7 +443,7 @@ class TruthRepository:
         self,
         ref: str = "consensus/main",
         limit: int = 10,
-    ) -> List[Verification]:
+    ) -> list[Verification]:
         """
         Obtener historial de verificaciones.
 
@@ -464,7 +462,7 @@ class TruthRepository:
 
         return history
 
-    def status(self) -> Dict:
+    def status(self) -> dict:
         """
         Obtener estado del repositorio.
 
@@ -484,7 +482,7 @@ class TruthRepository:
             "consensus": consensus_ref,
         }
 
-    def _read_config(self) -> Dict:
+    def _read_config(self) -> dict:
         """Leer configuración."""
         if not self.config_file.exists():
             return {}
@@ -508,7 +506,7 @@ class TruthRepository:
                     if obj:
                         yield obj
 
-    def count_objects(self) -> Dict[str, int]:
+    def count_objects(self) -> dict[str, int]:
         """Contar objetos por tipo."""
         counts = {}
         for obj_type in ObjectType:
@@ -569,7 +567,7 @@ def _test_repository():
         status = repo.status()
         assert status["staged_count"] == 0  # Cleared after verify
         assert status["consensus"] is not None
-        print(f"✅ Status works")
+        print("✅ Status works")
 
         # Test count
         counts = repo.count_objects()

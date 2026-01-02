@@ -17,11 +17,10 @@ Usage:
     validators = [OllamaValidator("llama3"), ClaudeValidator()]
 """
 
+import json
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
-import json
 
 
 @dataclass
@@ -32,7 +31,7 @@ class ValidationResult:
     reasoning: str
     model: str = ""
     tokens_used: int = 0
-    error: Optional[str] = None
+    error: str | None = None
 
     @property
     def success(self) -> bool:
@@ -79,7 +78,8 @@ class OllamaValidator(Validator):
     Models: llama3, mistral, phi3, gemma, etc.
     """
 
-    PROMPT_TEMPLATE = """You are a truth validator. Analyze the following claim and determine its accuracy.
+    PROMPT_TEMPLATE = """\
+You are a truth validator. Analyze the following claim and determine its accuracy.
 
 Claim: {claim}
 Domain: {domain}
@@ -388,7 +388,7 @@ class HumanValidator(Validator):
     def validate(self, claim: str, domain: str = "general") -> ValidationResult:
         """Prompt human for validation via stdin."""
         print(f"\n{'='*60}")
-        print(f"HUMAN VALIDATION REQUIRED")
+        print("HUMAN VALIDATION REQUIRED")
         print(f"{'='*60}")
         print(f"Claim: {claim}")
         print(f"Domain: {domain}")
@@ -417,7 +417,7 @@ class HumanValidator(Validator):
 # VALIDATOR REGISTRY
 # =============================================================================
 
-def get_default_validators(local_only: bool = False) -> List[Validator]:
+def get_default_validators(local_only: bool = False) -> list[Validator]:
     """
     Get default validators based on availability.
 
@@ -458,9 +458,9 @@ def get_default_validators(local_only: bool = False) -> List[Validator]:
 def validate_claim(
     claim: str,
     domain: str = "general",
-    validators: Optional[List[Validator]] = None,
+    validators: list[Validator] | None = None,
     min_validators: int = 2,
-) -> Tuple[List[ValidationResult], float]:
+) -> tuple[list[ValidationResult], float]:
     """
     Validate a claim using multiple validators.
 

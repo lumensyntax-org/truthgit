@@ -10,10 +10,10 @@ Esto garantiza:
 
 import hashlib
 import json
-from typing import Any, Dict, Union
+from typing import Any
 
 
-def canonical_serialize(obj: Dict[str, Any]) -> str:
+def canonical_serialize(obj: dict[str, Any]) -> str:
     """
     Serializar objeto de forma canónica para hashing consistente.
 
@@ -30,7 +30,7 @@ def canonical_serialize(obj: Dict[str, Any]) -> str:
     )
 
 
-def content_hash(content: Union[str, Dict[str, Any]], prefix: str = "") -> str:
+def content_hash(content: str | dict[str, Any], prefix: str = "") -> str:
     """
     Calcular hash SHA-256 del contenido.
 
@@ -56,7 +56,7 @@ def content_hash(content: Union[str, Dict[str, Any]], prefix: str = "") -> str:
     return hashlib.sha256(serialized.encode('utf-8')).hexdigest()
 
 
-def verify_hash(content: Union[str, Dict[str, Any]], expected_hash: str, prefix: str = "") -> bool:
+def verify_hash(content: str | dict[str, Any], expected_hash: str, prefix: str = "") -> bool:
     """
     Verificar que el contenido produce el hash esperado.
 

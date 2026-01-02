@@ -13,20 +13,20 @@ Quick Start:
     ✓ Consensus: 94% (3/3 validators)
 """
 
+from .hashing import content_hash, short_hash, verify_hash
 from .objects import (
     Axiom,
     AxiomType,
     Claim,
     ClaimCategory,
     ClaimState,
-    Context,
-    Verification,
     ConsensusResult,
     ConsensusType,
+    Context,
     TruthObject,
+    Verification,
     calculate_consensus,
 )
-from .hashing import content_hash, verify_hash, short_hash
 from .repository import TruthRepository
 
 __version__ = "0.1.0"
