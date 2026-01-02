@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Ollama - Local LLM inference
+  ollama:
+    image: ollama/ollama:latest
+    container_name: truthgit-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # TruthGit API Server
+  truthgit-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: truthgit-api
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - TRUTHGIT_REPO_PATH=/app/.truth
+    volumes:
+      - truthgit_data:/app/.truth
+    ports:
+      - "8000:8000"
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Model setup (runs once to pull models)
+  ollama-setup:
+    image: ollama/ollama:latest
+    container_name: truthgit-ollama-setup
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 10
+        ollama pull hermes3
+        ollama pull nemotron-mini
+        echo "Models ready!"
+    restart: "no"
+
+volumes:
+  ollama_data:
+  truthgit_data:
+
+networks:
+  default:
+    name: truthgit-network

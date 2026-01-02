@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "claim": {
+    "hash": "79d5993c51fa5651a6398cc1a977cb95f6a22e2724c1117886264fb8eb908270",
+    "content": "The Earth orbits the Sun in approximately 365 days",
+    "domain": "astronomy"
+  },
+  "verification": {
+    "hash": "f889a1cd6da84d9d211ae1a03d640c38104d72c8cf654345dc1b3978bf0b8252",
+    "consensus": 0.975,
+    "passed": true,
+    "validators": [
+      "OLLAMA:HERMES3",
+      "OLLAMA:NEMOTRON-MINI"
+    ],
+    "timestamp": "2026-01-02T11:37:35.174456"
+  },
+  "proof": {
+    "signature": "pFgTPx1HRpoUH-viT8_kfeggXEL8Jfi_b5gx2NU5qrwT97gLAmkUFFMQoqlr94TpjKzMjygKmbzKcM8aAZTKDQ==",
+    "public_key": "IZBTQnyB5cVzbAfaC0AQpXqmqI6mDiTOHssx3HQ2ViQ=",
+    "repo_id": "d37a20e6685dcb1d"
+  }
+}

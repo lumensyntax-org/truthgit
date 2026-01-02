@@ -857,5 +857,183 @@ def sync_domain(
     rprint(f"[green]✓[/green] Set mapping: '{pattern}' → domain '{domain}'")
 
 
+# =============================================================================
+# PROOF COMMANDS
+# =============================================================================
+
+
+@app.command()
+def prove(
+    hash_prefix: str = typer.Argument(..., help="Hash of claim or verification to prove"),
+    output: str = typer.Option(None, "--output", "-o", help="Output file for certificate"),
+    compact: bool = typer.Option(False, "--compact", "-c", help="Output compact base64 format"),
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """
+    Generate a cryptographic proof certificate for a verified claim.
+
+    The certificate can be shared and verified by anyone without
+    access to the original repository.
+
+    Examples:
+        truthgit prove d745672a                    # Print JSON certificate
+        truthgit prove d745672a -o proof.json      # Save to file
+        truthgit prove d745672a --compact          # Compact base64 format
+    """
+    from .proof import ProofManager
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository")
+        raise typer.Exit(1)
+
+    # Find the object
+    obj = repo.get_object_by_prefix(hash_prefix)
+    if not obj:
+        rprint(f"[red]✗[/red] No object found with prefix: {hash_prefix}")
+        raise typer.Exit(1)
+
+    obj_type, obj_data = obj
+
+    # Determine claim and verification
+    if obj_type.value == "claim":
+        # Find the verification that includes this claim
+        claim_hash = obj_data.get("$hash", "")
+        claim_content = obj_data.get("content", "")
+        claim_domain = obj_data.get("domain", "general")
+
+        # Look for verification containing this claim
+        verifications = repo.find_verifications_for_claim(claim_hash)
+        if not verifications:
+            rprint(f"[red]✗[/red] Claim {hash_prefix} has not been verified yet")
+            rprint("  Run: truthgit verify")
+            raise typer.Exit(1)
+
+        # Use most recent verification
+        verification = verifications[-1]
+        verification_hash = verification.get("$hash", "")
+        consensus = verification.get("consensus", {})
+
+    elif obj_type.value == "verification":
+        verification = obj_data
+        verification_hash = obj_data.get("$hash", "")
+        consensus = obj_data.get("consensus", {})
+
+        # Get claim from context
+        context_hash = verification.get("context", "")
+        context = repo.get_object(ObjectType.CONTEXT, context_hash)
+        if not context:
+            rprint(f"[red]✗[/red] Could not find context for verification")
+            raise typer.Exit(1)
+
+        claims = context.get("claims", [])
+        if not claims:
+            rprint(f"[red]✗[/red] Verification has no claims")
+            raise typer.Exit(1)
+
+        # Get first claim - claims can be strings or dicts with 'hash' key
+        first_claim = claims[0]
+        claim_hash = first_claim["hash"] if isinstance(first_claim, dict) else first_claim
+
+        claim_obj = repo.get_object(ObjectType.CLAIM, claim_hash)
+        if not claim_obj:
+            rprint(f"[red]✗[/red] Could not find claim")
+            raise typer.Exit(1)
+
+        claim_content = claim_obj.get("content", "")
+        claim_domain = claim_obj.get("domain", "general")
+    else:
+        rprint(f"[red]✗[/red] Cannot prove object of type: {obj_type.value}")
+        rprint("  Only claims and verifications can be proven")
+        raise typer.Exit(1)
+
+    # Create proof
+    proof_manager = ProofManager(repo.root)
+
+    try:
+        cert = proof_manager.create_proof(
+            claim_hash=claim_hash,
+            claim_content=claim_content,
+            claim_domain=claim_domain,
+            verification_hash=verification_hash,
+            consensus_value=consensus.get("value", 0),
+            consensus_passed=consensus.get("passed", False),
+            validators=list(verification.get("verifiers", {}).keys()),
+            timestamp=verification.get("metadata", {}).get("timestamp"),
+        )
+    except FileNotFoundError:
+        rprint("[red]✗[/red] No proof keys found. Reinitialize with: truthgit init --force")
+        raise typer.Exit(1)
+
+    # Output
+    if compact:
+        result = cert.to_compact()
+    else:
+        result = cert.to_json()
+
+    if output:
+        from pathlib import Path
+
+        Path(output).write_text(result)
+        rprint(f"[green]✓[/green] Proof certificate saved to: {output}")
+        rprint(f"  Repo ID: {cert.repo_id}")
+        rprint(f"  Claim: {cert.claim_content[:50]}...")
+        rprint(f"  Consensus: {cert.consensus_value:.0%}")
+    else:
+        rprint(Panel.fit("[bold]Proof Certificate[/bold]", border_style="green"))
+        rprint(result)
+
+    rprint(f"\n[dim]Verify with: truthgit verify-proof {'<file>' if output else '<certificate>'}[/dim]")
+
+
+@app.command("verify-proof")
+def verify_proof_cmd(
+    certificate: str = typer.Argument(..., help="Certificate (file path, JSON, or compact string)"),
+):
+    """
+    Verify a proof certificate.
+
+    Works without access to the original repository - anyone can verify.
+
+    Examples:
+        truthgit verify-proof proof.json           # Verify from file
+        truthgit verify-proof '{"version":...}'    # Verify JSON string
+        truthgit verify-proof eyJ2ZXJzaW9...       # Verify compact format
+    """
+    from pathlib import Path
+
+    from .proof import verify_proof_standalone
+
+    # Determine input type
+    # If it looks like JSON or base64, treat as data directly
+    if certificate.startswith("{") or certificate.startswith("eyJ"):
+        cert_data = certificate
+    else:
+        cert_path = Path(certificate)
+        if cert_path.exists():
+            cert_data = cert_path.read_text()
+        else:
+            cert_data = certificate
+
+    # Verify
+    is_valid, message, cert = verify_proof_standalone(cert_data)
+
+    if cert:
+        rprint(Panel.fit("[bold]Proof Verification[/bold]", border_style="blue"))
+        rprint(f"\n[bold]Claim:[/bold] {cert.claim_content}")
+        rprint(f"[bold]Domain:[/bold] {cert.claim_domain}")
+        rprint(f"[bold]Consensus:[/bold] {cert.consensus_value:.0%}")
+        rprint(f"[bold]Validators:[/bold] {', '.join(cert.validators)}")
+        rprint(f"[bold]Timestamp:[/bold] {cert.timestamp}")
+        rprint(f"[bold]Repo ID:[/bold] {cert.repo_id}")
+
+    if is_valid:
+        rprint(f"\n[green]✓ VALID[/green] {message}")
+    else:
+        rprint(f"\n[red]✗ INVALID[/red] {message}")
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

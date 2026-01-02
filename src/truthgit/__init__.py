@@ -62,8 +62,13 @@ from .validators import (
     get_default_validators,
     validate_claim,
 )
+from .proof import (
+    ProofCertificate,
+    ProofManager,
+    verify_proof_standalone,
+)
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __author__ = "TruthGit"
 __license__ = "MIT"
 
@@ -112,4 +117,8 @@ __all__ = [
     "HumanValidator",
     "get_default_validators",
     "validate_claim",
+    # Proof
+    "ProofCertificate",
+    "ProofManager",
+    "verify_proof_standalone",
 ]

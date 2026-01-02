@@ -1,0 +1,13 @@
+# TruthGit API Dependencies for Railway
+pydantic>=2.0.0
+rich>=13.0.0
+typer>=0.9.0
+httpx>=0.25.0
+python-dotenv>=1.0.0
+cryptography>=41.0.0
+fastapi>=0.109.0
+uvicorn>=0.27.0
+
+# Cloud validators
+anthropic>=0.40.0
+openai>=1.0.0

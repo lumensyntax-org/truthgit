@@ -99,6 +99,12 @@ class TruthRepository:
         }
         self.config_file.write_text(json.dumps(config, indent=2))
 
+        # Generate proof keypair for signing certificates
+        from .proof import ProofManager
+
+        proof_manager = ProofManager(self.root)
+        proof_manager.generate_keypair()
+
         return True
 
     def is_initialized(self) -> bool:
@@ -513,6 +519,82 @@ class TruthRepository:
             count = sum(1 for _ in self.iter_objects(obj_type))
             counts[obj_type.value] = count
         return counts
+
+    # === Lookup helpers ===
+
+    def get_object(self, obj_type: ObjectType, obj_hash: str) -> dict | None:
+        """Get object as dictionary by exact hash."""
+        obj = self.load(obj_type, obj_hash)
+        if obj:
+            data = json.loads(obj.serialize())
+            data["$hash"] = obj_hash
+            return data
+        return None
+
+    def get_object_by_prefix(self, prefix: str) -> tuple[ObjectType, dict] | None:
+        """
+        Find object by hash prefix (like git).
+
+        Returns:
+            Tuple of (object_type, object_data) or None
+        """
+        prefix = prefix.lower()
+
+        for obj_type in ObjectType:
+            type_prefix = self.OBJECT_PREFIXES[obj_type]
+            type_dir = self.objects_dir / type_prefix
+
+            if not type_dir.exists():
+                continue
+
+            # Check each subdirectory
+            for dir_entry in type_dir.iterdir():
+                if not dir_entry.is_dir():
+                    continue
+
+                for file_entry in dir_entry.iterdir():
+                    obj_hash = path_to_hash(dir_entry.name, file_entry.name)
+                    if obj_hash.startswith(prefix):
+                        obj = self.get_object(obj_type, obj_hash)
+                        if obj:
+                            return (obj_type, obj)
+
+        return None
+
+    def find_verifications_for_claim(self, claim_hash: str) -> list[dict]:
+        """
+        Find all verifications that include a specific claim.
+
+        Returns:
+            List of verification dicts, ordered by timestamp
+        """
+        results = []
+
+        for verification in self.iter_objects(ObjectType.VERIFICATION):
+            v_data = json.loads(verification.serialize())
+            v_hash = verification.compute_hash()
+            v_data["$hash"] = v_hash
+
+            # Check if this verification's context includes our claim
+            context_hash = v_data.get("context", "")
+            context = self.get_object(ObjectType.CONTEXT, context_hash)
+
+            if context:
+                # Claims can be strings or dicts with 'hash' key
+                claim_hashes = []
+                for c in context.get("claims", []):
+                    if isinstance(c, dict):
+                        claim_hashes.append(c.get("hash", ""))
+                    else:
+                        claim_hashes.append(c)
+
+                if claim_hash in claim_hashes:
+                    results.append(v_data)
+
+        # Sort by timestamp
+        results.sort(key=lambda v: v.get("metadata", {}).get("timestamp", ""))
+
+        return results
 
 
 # === Tests ===

@@ -103,12 +103,19 @@ Be objective. If uncertain, reflect that in a lower confidence score."""
         return self._name
 
     def is_available(self) -> bool:
-        """Check if Ollama is running."""
+        """Check if Ollama is running and this specific model exists."""
         try:
             import httpx
 
             response = httpx.get("http://localhost:11434/api/tags", timeout=2)
-            return response.status_code == 200
+            if response.status_code != 200:
+                return False
+
+            # Check if our specific model is available
+            data = response.json()
+            models = data.get("models", [])
+            model_names = [m.get("name", "").split(":")[0] for m in models]
+            return self.model in model_names or f"{self.model}:latest" in [m.get("name", "") for m in models]
         except Exception:
             return False
 
@@ -749,6 +756,21 @@ class HumanValidator(Validator):
 # =============================================================================
 
 
+def _get_ollama_models() -> list[str]:
+    """Get list of available Ollama models."""
+    try:
+        import httpx
+
+        response = httpx.get("http://localhost:11434/api/tags", timeout=2)
+        if response.status_code == 200:
+            data = response.json()
+            models = data.get("models", [])
+            return [m.get("name", "").split(":")[0] for m in models]
+    except Exception:
+        pass
+    return []
+
+
 def get_default_validators(local_only: bool = False) -> list[Validator]:
     """
     Get default validators based on availability.
@@ -761,8 +783,20 @@ def get_default_validators(local_only: bool = False) -> list[Validator]:
     """
     validators = []
 
-    # Try Ollama first (local, free)
-    ollama_models = ["llama3", "mistral", "phi3"]
+    # Get actually available Ollama models
+    available_ollama = _get_ollama_models()
+
+    # Prefer diverse models, fallback to whatever is available
+    # NOTE: logos-v1 to logos-v5 are local experiments, not functional validators
+    # Only Logos6 (Vertex AI) is production-ready
+    excluded_models = {"logos-v1", "logos-v2", "logos-v3", "logos-v4", "logos-v5",
+                       "logos-minimal", "logos-test-base", "logos-v2-stable"}
+    preferred_models = ["llama3", "mistral", "phi3", "hermes3", "nemotron-mini", "qwen2", "gemma"]
+    ollama_models = [m for m in preferred_models if m in available_ollama]
+    if not ollama_models:
+        # Use available models excluding experimental logos
+        ollama_models = [m for m in available_ollama if m not in excluded_models][:3]
+
     for model in ollama_models:
         v = OllamaValidator(model)
         if v.is_available():
@@ -773,7 +807,7 @@ def get_default_validators(local_only: bool = False) -> list[Validator]:
         # For local mode, use multiple Ollama models for diversity
         for model in ollama_models:
             v = OllamaValidator(model)
-            if v.is_available() and v not in validators:
+            if v.is_available() and v.name not in [x.name for x in validators]:
                 validators.append(v)
                 if len(validators) >= 3:
                     break
