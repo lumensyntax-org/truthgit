@@ -28,4 +28,4 @@ RUN mkdir -p /app/.truth
 EXPOSE 8000
 
 # Run the API server - Railway provides $PORT
-CMD uvicorn truthgit.api.server:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD ["sh", "-c", "uvicorn truthgit.api.server:app --host 0.0.0.0 --port ${PORT:-8000}"]
