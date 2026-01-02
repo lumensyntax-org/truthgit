@@ -11,8 +11,22 @@ Quick Start:
     $ truthgit claim "Water boils at 100°C at sea level" --domain physics
     $ truthgit verify
     ✓ Consensus: 94% (3/3 validators)
+
+Knowledge Extraction:
+    $ truthgit extract "document.txt" --domain physics
+    $ truthgit patterns --domain physics
+    $ truthgit axioms --promote
 """
 
+from .extractor import (
+    Contradiction,
+    ContradictionSeverity,
+    ExtractionResult,
+    KnowledgeExtractor,
+    Pattern,
+    PatternType,
+    extract_from_text,
+)
 from .hashing import content_hash, short_hash, verify_hash
 from .objects import (
     Axiom,
@@ -29,7 +43,7 @@ from .objects import (
 )
 from .repository import TruthRepository
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "TruthGit"
 __license__ = "MIT"
 
@@ -52,4 +66,12 @@ __all__ = [
     "short_hash",
     # Repository
     "TruthRepository",
+    # Extractor
+    "KnowledgeExtractor",
+    "Pattern",
+    "PatternType",
+    "Contradiction",
+    "ContradictionSeverity",
+    "ExtractionResult",
+    "extract_from_text",
 ]

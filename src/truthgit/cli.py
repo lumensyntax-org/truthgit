@@ -313,5 +313,343 @@ def validators(
     rprint("  Set environment variables: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY")
 
 
+# =============================================================================
+# KNOWLEDGE EXTRACTION COMMANDS
+# =============================================================================
+
+
+@app.command()
+def extract(
+    source: str = typer.Argument(..., help="Text or file path to extract from"),
+    domain: str = typer.Option("general", "--domain", "-d", help="Knowledge domain"),
+    auto_verify: bool = typer.Option(False, "--verify", "-v", help="Auto-verify claims"),
+    local: bool = typer.Option(True, "--local", "-l", help="Use local LLM (Ollama)"),
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """Extract atomic claims from a document or text."""
+    import os
+
+    from .extractor import KnowledgeExtractor
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository. Run: truthgit init")
+        raise typer.Exit(1)
+
+    # Check if source is a file
+    if os.path.isfile(source):
+        with open(source, encoding="utf-8") as f:
+            text = f.read()
+        rprint(f"[dim]Reading from file:[/dim] {source}")
+    else:
+        text = source
+
+    rprint(f"[bold]Extracting claims from {len(text)} characters...[/bold]\n")
+
+    try:
+        extractor = KnowledgeExtractor(repo, use_local=local)
+        claims = extractor.ingest_document(
+            document=text,
+            domain=domain,
+            auto_verify=auto_verify,
+        )
+    except Exception as e:
+        rprint(f"[red]✗[/red] Extraction failed: {e}")
+        if local:
+            rprint("\nMake sure Ollama is running: ollama serve")
+        raise typer.Exit(1)
+
+    if not claims:
+        rprint("[yellow]No claims extracted[/yellow]")
+        return
+
+    rprint(f"[green]✓[/green] Extracted {len(claims)} claims:\n")
+
+    table = Table(title=f"Claims ({domain})")
+    table.add_column("Hash", style="cyan", width=10)
+    table.add_column("Content", width=50)
+    table.add_column("Confidence", justify="right", width=10)
+
+    for claim in claims:
+        table.add_row(
+            claim.short_hash,
+            claim.content[:50] + ("..." if len(claim.content) > 50 else ""),
+            f"{claim.confidence:.0%}",
+        )
+
+    console.print(table)
+
+    rprint("\n[dim]Claims staged. Run [bold]truthgit verify[/bold] to validate.[/dim]")
+
+
+@app.command()
+def patterns(
+    domain: str = typer.Option(None, "--domain", "-d", help="Filter by domain"),
+    min_confidence: float = typer.Option(0.6, "--min", "-m", help="Min confidence"),
+    local: bool = typer.Option(True, "--local", "-l", help="Use local LLM"),
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """Find patterns across verified claims."""
+    from .extractor import KnowledgeExtractor
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository. Run: truthgit init")
+        raise typer.Exit(1)
+
+    rprint("[bold]Analyzing patterns...[/bold]\n")
+
+    try:
+        extractor = KnowledgeExtractor(repo, use_local=local)
+        found_patterns = extractor.find_patterns(
+            domain=domain,
+            min_confidence=min_confidence,
+        )
+    except Exception as e:
+        rprint(f"[red]✗[/red] Pattern analysis failed: {e}")
+        raise typer.Exit(1)
+
+    if not found_patterns:
+        rprint("[yellow]No patterns found[/yellow]")
+        rprint("  Extract more claims first: truthgit extract '...'")
+        return
+
+    table = Table(title="Detected Patterns")
+    table.add_column("Type", style="blue", width=15)
+    table.add_column("Description", width=40)
+    table.add_column("Claims", width=20)
+    table.add_column("Confidence", justify="right", width=10)
+
+    for p in found_patterns:
+        claims_str = ", ".join(h[:8] for h in p.claims)
+        table.add_row(
+            p.pattern_type.value,
+            p.description[:40] + ("..." if len(p.description) > 40 else ""),
+            claims_str,
+            f"{p.confidence:.0%}",
+        )
+
+    console.print(table)
+
+
+@app.command()
+def contradictions(
+    claim_hash: str = typer.Argument(None, help="Check specific claim (optional)"),
+    local: bool = typer.Option(True, "--local", "-l", help="Use local LLM"),
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """Detect contradictions between claims."""
+    from .extractor import KnowledgeExtractor
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository. Run: truthgit init")
+        raise typer.Exit(1)
+
+    extractor = KnowledgeExtractor(repo, use_local=local)
+
+    # Get claims to check
+    claims = list(repo.iter_objects(ObjectType.CLAIM))
+
+    if not claims:
+        rprint("[yellow]No claims to check[/yellow]")
+        return
+
+    if claim_hash:
+        # Check specific claim
+        target = None
+        for c in claims:
+            if c.hash.startswith(claim_hash):
+                target = c
+                break
+        if not target:
+            rprint(f"[red]✗[/red] Claim not found: {claim_hash}")
+            raise typer.Exit(1)
+
+        rprint(f"[bold]Checking contradictions for:[/bold] {target.content[:50]}...\n")
+        found = extractor.detect_contradictions(target, against=claims)
+    else:
+        # Check all claims against each other
+        rprint(f"[bold]Checking {len(claims)} claims for contradictions...[/bold]\n")
+        found = []
+        seen = set()
+        for c in claims:
+            for contradiction in extractor.detect_contradictions(c, against=claims):
+                # Avoid duplicates
+                key = tuple(sorted([contradiction.claim_a_hash, contradiction.claim_b_hash]))
+                if key not in seen:
+                    seen.add(key)
+                    found.append(contradiction)
+
+    if not found:
+        rprint("[green]✓[/green] No contradictions found")
+        return
+
+    table = Table(title="Detected Contradictions")
+    table.add_column("Severity", style="red", width=10)
+    table.add_column("Claim A", width=15)
+    table.add_column("Claim B", width=15)
+    table.add_column("Explanation", width=35)
+    table.add_column("Confidence", justify="right", width=10)
+
+    for c in found:
+        table.add_row(
+            c.severity.value.upper(),
+            c.claim_a_hash[:12],
+            c.claim_b_hash[:12],
+            c.explanation[:35] + ("..." if len(c.explanation) > 35 else ""),
+            f"{c.confidence:.0%}",
+        )
+
+    console.print(table)
+
+    if any(c.resolution_hint for c in found):
+        rprint("\n[bold]Resolution hints:[/bold]")
+        for c in found:
+            if c.resolution_hint:
+                rprint(f"  • {c.claim_a_hash[:8]}↔{c.claim_b_hash[:8]}: {c.resolution_hint}")
+
+
+@app.command()
+def axioms(
+    promote: bool = typer.Option(False, "--promote", help="Promote eligible claims"),
+    min_verifications: int = typer.Option(2, "--min-verifications", "-n"),
+    min_confidence: float = typer.Option(0.90, "--min-confidence", "-c"),
+    local: bool = typer.Option(True, "--local", "-l", help="Use local LLM"),
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """Show axiom candidates and optionally promote them."""
+    from .extractor import KnowledgeExtractor
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository. Run: truthgit init")
+        raise typer.Exit(1)
+
+    # Show existing axioms
+    existing = list(repo.iter_objects(ObjectType.AXIOM))
+    if existing:
+        table = Table(title="Existing Axioms")
+        table.add_column("Hash", style="cyan", width=10)
+        table.add_column("Content", width=50)
+        table.add_column("Type", width=15)
+        table.add_column("Domain", width=10)
+
+        for a in existing:
+            table.add_row(
+                a.short_hash,
+                a.content[:50] + ("..." if len(a.content) > 50 else ""),
+                a.axiom_type.value,
+                a.domain,
+            )
+
+        console.print(table)
+        rprint("")
+
+    # Find candidates
+    extractor = KnowledgeExtractor(repo, use_local=local)
+    candidates = extractor.find_axiom_candidates(
+        min_verifications=min_verifications,
+        min_avg_confidence=min_confidence,
+    )
+
+    if not candidates:
+        rprint("[dim]No axiom candidates found[/dim]")
+        rprint(f"  Requires: {min_verifications}+ verifications, ")
+        rprint(f"  {min_confidence:.0%}+ avg confidence")
+        return
+
+    table = Table(title="Axiom Candidates")
+    table.add_column("Hash", style="yellow", width=10)
+    table.add_column("Content", width=40)
+    table.add_column("Verifications", justify="right", width=12)
+    table.add_column("Avg Confidence", justify="right", width=12)
+
+    for claim, avg_conf, num_verifications in candidates:
+        table.add_row(
+            claim.short_hash,
+            claim.content[:40] + ("..." if len(claim.content) > 40 else ""),
+            str(num_verifications),
+            f"{avg_conf:.1%}",
+        )
+
+    console.print(table)
+
+    if promote:
+        rprint("\n[bold]Promoting to axioms...[/bold]")
+        promoted = 0
+        for claim, avg_conf, _ in candidates:
+            axiom = extractor.promote_to_axiom(
+                claim,
+                min_verifications=min_verifications,
+                min_avg_confidence=min_confidence,
+            )
+            if axiom:
+                rprint(f"  [green]✓[/green] {claim.short_hash} → AXIOM {axiom.short_hash}")
+                promoted += 1
+            else:
+                rprint(f"  [yellow]○[/yellow] {claim.short_hash} has contradictions, skipped")
+
+        rprint(f"\n[green]Promoted {promoted} claims to axioms[/green]")
+
+
+@app.command()
+def graph(
+    domain: str = typer.Argument(..., help="Domain to export"),
+    output: str = typer.Option(None, "--output", "-o", help="Output file (JSON)"),
+    local: bool = typer.Option(True, "--local", "-l", help="Use local LLM"),
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """Export knowledge graph for a domain."""
+    import json as json_module
+
+    from .extractor import KnowledgeExtractor
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository. Run: truthgit init")
+        raise typer.Exit(1)
+
+    rprint(f"[bold]Building knowledge graph for: {domain}[/bold]\n")
+
+    extractor = KnowledgeExtractor(repo, use_local=local)
+    graph_data = extractor.extract_domain_graph(domain)
+
+    nodes = graph_data["nodes"]
+    edges = graph_data["edges"]
+
+    rprint("[green]✓[/green] Graph extracted:")
+    rprint(f"  Nodes: {len(nodes)} ({sum(1 for n in nodes if n['type'] == 'axiom')} axioms)")
+    rprint(f"  Edges: {len(edges)} patterns")
+
+    if output:
+        with open(output, "w", encoding="utf-8") as f:
+            json_module.dump(graph_data, f, indent=2)
+        rprint(f"\n[dim]Saved to: {output}[/dim]")
+    else:
+        # Print summary
+        if nodes:
+            rprint("\n[bold]Nodes:[/bold]")
+            for n in nodes[:10]:
+                icon = "★" if n["type"] == "axiom" else "○"
+                rprint(f"  {icon} [{n['short_hash']}] {n['content'][:40]}...")
+
+            if len(nodes) > 10:
+                rprint(f"  ... and {len(nodes) - 10} more")
+
+        if edges:
+            rprint("\n[bold]Edges:[/bold]")
+            for e in edges[:10]:
+                rprint(f"  {e['source'][:8]} ─[{e['type']}]─▶ {e['target'][:8]}")
+
+            if len(edges) > 10:
+                rprint(f"  ... and {len(edges) - 10} more")
+
+
 if __name__ == "__main__":
     app()
