@@ -3,19 +3,37 @@ TruthGit FastAPI Server
 Production-ready API for claim verification and proof generation.
 """
 
+import base64
 import json
+import os
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
 
+
+def setup_gcp_credentials():
+    """Setup GCP credentials from environment variable for Railway/production."""
+    gcp_creds_b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
+    if gcp_creds_b64:
+        creds_path = "/tmp/gcp-credentials.json"
+        with open(creds_path, "w") as f:
+            f.write(base64.b64decode(gcp_creds_b64).decode("utf-8"))
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
+        return True
+    return False
+
+
+# Setup GCP credentials on module load
+setup_gcp_credentials()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from truthgit.repository import TruthRepository
-from truthgit.validators import OllamaValidator, ClaudeValidator, GPTValidator, get_default_validators
+from truthgit.validators import OllamaValidator, ClaudeValidator, GPTValidator, Logos6Validator, get_default_validators
 from truthgit.proof import ProofManager, verify_proof_standalone
 
 
@@ -187,17 +205,21 @@ async def verify_claim(request: VerifyRequest):
             category="factual",
         )
 
-        # Create validators - use cloud if available, fallback to Ollama
-        validators = get_default_validators(local_only=False)
+        # Create validators - prioritize Logos6 (our trained model on Vertex AI)
+        validators = []
+
+        # Try Logos6 first (Vertex AI)
+        logos6 = Logos6Validator()
+        if logos6.is_available():
+            validators.append(logos6)
+
+        # Add cloud validators as backup
+        for v in [ClaudeValidator(), GPTValidator()]:
+            if v.is_available():
+                validators.append(v)
+
+        # Fallback to Ollama for local dev
         if not validators:
-            # Fallback to explicit validators
-            validators = [
-                ClaudeValidator(),
-                GPTValidator(),
-            ]
-            validators = [v for v in validators if v.is_available()]
-        if not validators:
-            # Last resort: try Ollama
             validators = [
                 OllamaValidator(model="hermes3"),
                 OllamaValidator(model="nemotron-mini"),
@@ -266,11 +288,14 @@ async def generate_proof(request: ProveRequest):
             category="factual",
         )
 
-        # Create validators - use cloud if available, fallback to Ollama
-        validators = get_default_validators(local_only=False)
-        if not validators:
-            validators = [ClaudeValidator(), GPTValidator()]
-            validators = [v for v in validators if v.is_available()]
+        # Create validators - prioritize Logos6 (Vertex AI)
+        validators = []
+        logos6 = Logos6Validator()
+        if logos6.is_available():
+            validators.append(logos6)
+        for v in [ClaudeValidator(), GPTValidator()]:
+            if v.is_available():
+                validators.append(v)
         if not validators:
             validators = [OllamaValidator(model="hermes3"), OllamaValidator(model="nemotron-mini")]
 
