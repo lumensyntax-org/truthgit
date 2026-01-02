@@ -232,6 +232,16 @@ async def verify_claim(request: VerifyRequest):
         for validator in validators:
             try:
                 result = validator.validate(request.claim, request.domain)
+                # Check if validator actually succeeded (no error)
+                if result.error:
+                    # Log the error but continue to next validator
+                    validator_details.append({
+                        "name": result.validator_name,
+                        "confidence": 0,
+                        "reasoning": f"Error: {result.error[:100]}",
+                    })
+                    continue
+
                 verifier_results[result.validator_name] = (result.confidence, result.reasoning)
                 validator_details.append({
                     "name": result.validator_name,
@@ -239,7 +249,12 @@ async def verify_claim(request: VerifyRequest):
                     "reasoning": result.reasoning[:200] + "..." if len(result.reasoning) > 200 else result.reasoning,
                 })
             except Exception as e:
-                # Skip failed validators
+                # Skip failed validators but log the error
+                validator_details.append({
+                    "name": validator.name,
+                    "confidence": 0,
+                    "reasoning": f"Exception: {str(e)[:100]}",
+                })
                 continue
 
         if len(verifier_results) < 2:
@@ -306,6 +321,9 @@ async def generate_proof(request: ProveRequest):
         for validator in validators:
             try:
                 result = validator.validate(request.claim, request.domain)
+                # Skip validators that returned errors
+                if result.error:
+                    continue
                 verifier_results[result.validator_name] = (result.confidence, result.reasoning)
                 validator_names.append(result.validator_name)
             except Exception:
