@@ -1,6 +1,9 @@
 # TruthGit API Server Dockerfile
 FROM python:3.12-slim
 
+# Force rebuild - v2
+ARG CACHEBUST=2
+
 WORKDIR /app
 
 # Install system dependencies
