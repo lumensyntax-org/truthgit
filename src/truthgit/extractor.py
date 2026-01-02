@@ -301,15 +301,27 @@ Only output valid JSON."""
         # Parse response
         try:
             parsed = json.loads(response)
+            # Handle wrapped response {"claims": [...]}
+            if isinstance(parsed, dict):
+                if "claims" in parsed:
+                    parsed = parsed["claims"]
+                else:
+                    parsed = [parsed]
             if not isinstance(parsed, list):
                 parsed = [parsed]
         except json.JSONDecodeError:
-            # Try to extract JSON from response
+            # Try to extract JSON array from response
             match = re.search(r"\[.*\]", response, re.DOTALL)
             if match:
                 parsed = json.loads(match.group())
             else:
-                raise ValueError(f"Could not parse LLM response: {response[:200]}")
+                # Try to extract JSON object
+                match = re.search(r"\{.*\}", response, re.DOTALL)
+                if match:
+                    obj = json.loads(match.group())
+                    parsed = obj.get("claims", [obj])
+                else:
+                    raise ValueError(f"Could not parse LLM response: {response[:200]}")
 
         # Create claims
         claims = []

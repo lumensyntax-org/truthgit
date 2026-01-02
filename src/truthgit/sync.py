@@ -51,6 +51,7 @@ class FileType(Enum):
 EXTENSION_MAP = {
     ".md": FileType.MARKDOWN,
     ".markdown": FileType.MARKDOWN,
+    ".mdx": FileType.MARKDOWN,  # MDX (Markdown + JSX)
     ".rst": FileType.RST,
     ".txt": FileType.TEXT,
     ".py": FileType.PYTHON_DOCSTRING,
