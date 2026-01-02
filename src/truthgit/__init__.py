@@ -49,6 +49,19 @@ from .sync import (
     SyncState,
     sync_docs,
 )
+from .validators import (
+    ClaudeValidator,
+    GeminiValidator,
+    GPTValidator,
+    HuggingFaceValidator,
+    HumanValidator,
+    Logos6Validator,
+    OllamaValidator,
+    ValidationResult,
+    Validator,
+    get_default_validators,
+    validate_claim,
+)
 
 __version__ = "0.3.0"
 __author__ = "TruthGit"
@@ -87,4 +100,16 @@ __all__ = [
     "SyncResult",
     "SyncState",
     "sync_docs",
+    # Validators
+    "Validator",
+    "ValidationResult",
+    "OllamaValidator",
+    "ClaudeValidator",
+    "GPTValidator",
+    "GeminiValidator",
+    "HuggingFaceValidator",
+    "Logos6Validator",
+    "HumanValidator",
+    "get_default_validators",
+    "validate_claim",
 ]

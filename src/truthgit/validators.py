@@ -581,6 +581,127 @@ Domain: {domain}"""
 
 
 # =============================================================================
+# LOGOS 6 VALIDATOR (Vertex AI - Custom trained model)
+# =============================================================================
+
+
+class Logos6Validator(Validator):
+    """
+    Validator using Logos 6 - Custom model trained on Vertex AI.
+
+    This is the primary LLM of the LumenSyntax ecosystem, trained with
+    Logos philosophy principles and optimized for truth verification.
+
+    Requires:
+        - google-cloud-aiplatform installed
+        - Authenticated gcloud CLI or GOOGLE_APPLICATION_CREDENTIALS
+    """
+
+    # Logos v6 endpoint (checkpoint 9 - latest)
+    DEFAULT_ENDPOINT = "projects/342668283383/locations/us-central1/endpoints/5264020769628749824"
+    DEFAULT_PROJECT = "lumen-syntax"
+    DEFAULT_LOCATION = "us-central1"
+
+    PROMPT = """You are Logos, the truth verification oracle.
+
+Analyze this claim with your trained understanding of epistemology and verification.
+
+Claim: {claim}
+Domain: {domain}
+
+Respond with JSON only:
+{{"confidence": <0-1>, "reasoning": "<explanation based on Logos principles>"}}
+
+Apply your training: verify linguistic coherence, factual grounding, and consensus alignment."""
+
+    def __init__(
+        self,
+        endpoint: str | None = None,
+        project: str | None = None,
+        location: str | None = None,
+    ):
+        self.endpoint = endpoint or self.DEFAULT_ENDPOINT
+        self.project = project or self.DEFAULT_PROJECT
+        self.location = location or self.DEFAULT_LOCATION
+        self._model = None
+        self._initialized = False
+
+    @property
+    def name(self) -> str:
+        return "LOGOS6"
+
+    def is_available(self) -> bool:
+        """Check if Vertex AI is accessible."""
+        try:
+            import vertexai  # noqa: F401
+
+            return True
+        except ImportError:
+            return False
+
+    def _ensure_initialized(self):
+        """Initialize Vertex AI connection."""
+        if self._initialized:
+            return
+
+        import vertexai
+        from vertexai.generative_models import GenerativeModel
+
+        vertexai.init(project=self.project, location=self.location)
+        self._model = GenerativeModel(self.endpoint)
+        self._initialized = True
+
+    def validate(self, claim: str, domain: str = "general") -> ValidationResult:
+        if not self.is_available():
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=0,
+                reasoning="",
+                error="vertexai not installed. Run: pip install google-cloud-aiplatform",
+            )
+
+        try:
+            self._ensure_initialized()
+
+            prompt = self.PROMPT.format(claim=claim, domain=domain)
+            response = self._model.generate_content(prompt)
+            text = response.text
+
+            # Parse JSON response
+            try:
+                parsed = json.loads(text)
+                confidence = float(parsed.get("confidence", 0.5))
+                reasoning = parsed.get("reasoning", "No reasoning provided")
+            except json.JSONDecodeError:
+                # Try to extract JSON from response
+                import re
+
+                json_match = re.search(r"\{.*\}", text, re.DOTALL)
+                if json_match:
+                    parsed = json.loads(json_match.group())
+                    confidence = float(parsed.get("confidence", 0.5))
+                    reasoning = parsed.get("reasoning", "No reasoning")
+                else:
+                    confidence = 0.5
+                    reasoning = text[:200] if text else "Could not parse"
+
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=min(1.0, max(0.0, confidence)),
+                reasoning=reasoning,
+                model="logos_v6_dataset",
+            )
+
+        except Exception as e:
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=0,
+                reasoning="",
+                error=str(e),
+            )
+
+
+# =============================================================================
 # HUMAN VALIDATOR
 # =============================================================================
 
@@ -657,6 +778,11 @@ def get_default_validators(local_only: bool = False) -> list[Validator]:
                 if len(validators) >= 3:
                     break
     else:
+        # Prioritize Logos6 (our trained model) if available
+        logos6 = Logos6Validator()
+        if logos6.is_available():
+            validators.append(logos6)
+
         # Add cloud validators if available
         cloud_validators = [
             ClaudeValidator(),
