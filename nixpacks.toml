@@ -1,8 +1,0 @@
-[phases.setup]
-nixPkgs = ["python312", "gcc"]
-
-[phases.install]
-cmds = ["pip install -e '.[cloud]' google-cloud-aiplatform"]
-
-[start]
-cmd = "uvicorn truthgit.api.server:app --host 0.0.0.0 --port ${PORT:-8000}"
