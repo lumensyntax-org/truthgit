@@ -18,6 +18,7 @@ from .hashing import content_hash
 
 # === Enums ===
 
+
 class ObjectType(str, Enum):
     AXIOM = "axiom"
     CLAIM = "claim"
@@ -60,13 +61,14 @@ class RelationType(str, Enum):
 
 
 class ConsensusType(str, Enum):
-    UNANIMOUS = "unanimous"      # 100% acuerdo
+    UNANIMOUS = "unanimous"  # 100% acuerdo
     SUPERMAJORITY = "supermajority"  # >= 75%
-    MAJORITY = "majority"        # >= 66%
-    DISPUTED = "disputed"        # < 66%
+    MAJORITY = "majority"  # >= 66%
+    DISPUTED = "disputed"  # < 66%
 
 
 # === Base Class ===
+
 
 class TruthObject(ABC):
     """Clase base para todos los objetos de TruthGit."""
@@ -133,6 +135,7 @@ class TruthObject(ABC):
 
 
 # === AXIOM ===
+
 
 @dataclass
 class Axiom(TruthObject):
@@ -213,9 +216,11 @@ class Axiom(TruthObject):
 
 # === CLAIM ===
 
+
 @dataclass
 class Source:
     """Fuente que soporta un claim."""
+
     url: str
     title: str = ""
     source_type: str = "PRIMARY"  # PRIMARY, SECONDARY, TERTIARY
@@ -226,6 +231,7 @@ class Source:
 @dataclass
 class VerifierRecord:
     """Registro de verificación por un agente."""
+
     verifier: str  # e.g., "CLAUDE.ANALYST"
     confidence: float
     reasoning: str
@@ -369,9 +375,11 @@ class Claim(TruthObject):
 
 # === CONTEXT ===
 
+
 @dataclass
 class ClaimRef:
     """Referencia a un claim dentro de un context."""
+
     hash: str
     role: str = "PRIMARY"  # PRIMARY, SUPPORTING, DERIVED
 
@@ -379,6 +387,7 @@ class ClaimRef:
 @dataclass
 class ContextRef:
     """Referencia a un subcontexto."""
+
     hash: str
     relation: str = "CONTAINS"  # CONTAINS, SPECIALIZES, EXTENDS
 
@@ -386,6 +395,7 @@ class ContextRef:
 @dataclass
 class Relation:
     """Relación entre dos claims."""
+
     from_hash: str
     to_hash: str
     relation_type: RelationType
@@ -446,8 +456,7 @@ class Context(TruthObject):
     @classmethod
     def from_dict(cls, data: dict) -> "Context":
         claims = [
-            ClaimRef(hash=c["hash"], role=c.get("role", "PRIMARY"))
-            for c in data.get("claims", [])
+            ClaimRef(hash=c["hash"], role=c.get("role", "PRIMARY")) for c in data.get("claims", [])
         ]
         subcontexts = [
             ContextRef(hash=s["hash"], relation=s.get("relation", "CONTAINS"))
@@ -478,9 +487,11 @@ class Context(TruthObject):
 
 # === VERIFICATION ===
 
+
 @dataclass
 class VerifierVote:
     """Voto de un verificador en una verification."""
+
     roles: list[str]
     confidence: float
     reasoning: str
@@ -493,6 +504,7 @@ class VerifierVote:
 @dataclass
 class ConsensusResult:
     """Resultado del cálculo de consenso."""
+
     consensus_type: ConsensusType
     value: float
     threshold: float
@@ -530,10 +542,7 @@ class Verification(TruthObject):
             "type": "verification",
             "context": self.context_hash,
             "parent": self.parent_hash,
-            "verifiers": {
-                k: v.confidence
-                for k, v in sorted(self.verifiers.items())
-            },
+            "verifiers": {k: v.confidence for k, v in sorted(self.verifiers.items())},
             "timestamp": self.timestamp,
         }
 
@@ -608,6 +617,7 @@ class Verification(TruthObject):
 
 # === Factory Functions ===
 
+
 def calculate_consensus(
     verifier_confidences: dict[str, float],
     threshold: float = 0.66,
@@ -638,10 +648,7 @@ def calculate_consensus(
         weights = {k: 1.0 / n for k in verifier_confidences}
 
     # Promedio ponderado
-    value = sum(
-        verifier_confidences[k] * weights.get(k, 0)
-        for k in verifier_confidences
-    )
+    value = sum(verifier_confidences[k] * weights.get(k, 0) for k in verifier_confidences)
 
     # Determinar tipo de consenso
     if value >= 1.0:
@@ -663,6 +670,7 @@ def calculate_consensus(
 
 
 # === Tests ===
+
 
 def _test_objects():
     """Pruebas de los objetos."""

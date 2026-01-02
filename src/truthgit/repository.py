@@ -25,7 +25,7 @@ from .objects import (
     calculate_consensus,
 )
 
-T = TypeVar('T', bound=TruthObject)
+T = TypeVar("T", bound=TruthObject)
 
 
 class TruthRepository:
@@ -128,7 +128,7 @@ class TruthRepository:
 
         # Serializar y comprimir
         serialized = obj.serialize()
-        compressed = zlib.compress(serialized.encode('utf-8'))
+        compressed = zlib.compress(serialized.encode("utf-8"))
 
         # Escribir
         obj_path.write_bytes(compressed)
@@ -149,7 +149,7 @@ class TruthRepository:
 
         # Leer y descomprimir
         compressed = obj_path.read_bytes()
-        serialized = zlib.decompress(compressed).decode('utf-8')
+        serialized = zlib.decompress(compressed).decode("utf-8")
 
         return TruthObject.deserialize(serialized)
 
@@ -516,6 +516,7 @@ class TruthRepository:
 
 
 # === Tests ===
+
 
 def _test_repository():
     """Pruebas del repositorio."""

@@ -26,6 +26,7 @@ from dataclasses import dataclass
 @dataclass
 class ValidationResult:
     """Result from a single validator."""
+
     validator_name: str
     confidence: float
     reasoning: str
@@ -70,6 +71,7 @@ class Validator(ABC):
 # LOCAL VALIDATORS (No API keys required)
 # =============================================================================
 
+
 class OllamaValidator(Validator):
     """
     Validator using Ollama for local LLM inference.
@@ -104,6 +106,7 @@ Be objective. If uncertain, reflect that in a lower confidence score."""
         """Check if Ollama is running."""
         try:
             import httpx
+
             response = httpx.get("http://localhost:11434/api/tags", timeout=2)
             return response.status_code == 200
         except Exception:
@@ -167,6 +170,7 @@ Be objective. If uncertain, reflect that in a lower confidence score."""
 # CLOUD VALIDATORS (Require API keys)
 # =============================================================================
 
+
 class ClaudeValidator(Validator):
     """Validator using Anthropic's Claude API."""
 
@@ -203,10 +207,12 @@ Domain: {domain}"""
             response = client.messages.create(
                 model=self.model,
                 max_tokens=256,
-                messages=[{
-                    "role": "user",
-                    "content": self.PROMPT.format(claim=claim, domain=domain),
-                }],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": self.PROMPT.format(claim=claim, domain=domain),
+                    }
+                ],
             )
 
             text = response.content[0].text
@@ -271,10 +277,12 @@ Domain: {domain}"""
             client = openai.OpenAI(api_key=self.api_key)
             response = client.chat.completions.create(
                 model=self.model,
-                messages=[{
-                    "role": "user",
-                    "content": self.PROMPT.format(claim=claim, domain=domain),
-                }],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": self.PROMPT.format(claim=claim, domain=domain),
+                    }
+                ],
                 max_tokens=256,
                 response_format={"type": "json_object"},
             )
@@ -375,6 +383,7 @@ Domain: {domain}"""
 # HUMAN VALIDATOR
 # =============================================================================
 
+
 class HumanValidator(Validator):
     """Interactive human validation via CLI."""
 
@@ -387,12 +396,12 @@ class HumanValidator(Validator):
 
     def validate(self, claim: str, domain: str = "general") -> ValidationResult:
         """Prompt human for validation via stdin."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("HUMAN VALIDATION REQUIRED")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Claim: {claim}")
         print(f"Domain: {domain}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         try:
             confidence_str = input("Confidence (0-100): ").strip()
@@ -416,6 +425,7 @@ class HumanValidator(Validator):
 # =============================================================================
 # VALIDATOR REGISTRY
 # =============================================================================
+
 
 def get_default_validators(local_only: bool = False) -> list[Validator]:
     """

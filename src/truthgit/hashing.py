@@ -26,7 +26,7 @@ def canonical_serialize(obj: dict[str, Any]) -> str:
         obj,
         sort_keys=True,
         ensure_ascii=False,
-        separators=(',', ':'),
+        separators=(",", ":"),
     )
 
 
@@ -53,7 +53,7 @@ def content_hash(content: str | dict[str, Any], prefix: str = "") -> str:
     if prefix:
         serialized = f"{prefix}\0{serialized}"
 
-    return hashlib.sha256(serialized.encode('utf-8')).hexdigest()
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 def verify_hash(content: str | dict[str, Any], expected_hash: str, prefix: str = "") -> bool:
@@ -122,6 +122,7 @@ class HashVerificationError(Exception):
 
 
 # === Tests ===
+
 
 def _test_hashing():
     """Pruebas del sistema de hashing."""

@@ -9,7 +9,6 @@ Usage:
     truthgit status                  Show repository status
 """
 
-
 import typer
 from rich import print as rprint
 from rich.console import Console
@@ -51,7 +50,7 @@ def init(
         repo.init(force=force)
         rprint(f"[green]✓[/green] Initialized truth repository in [bold]{path}/[/bold]")
         rprint("\nNext steps:")
-        rprint("  truthgit claim \"Your statement here\" --domain general")
+        rprint('  truthgit claim "Your statement here" --domain general')
         rprint("  truthgit verify")
     except FileExistsError:
         rprint(f"[red]✗[/red] Repository already exists at {path}/")
@@ -140,7 +139,7 @@ def verify(
     staged = repo.get_staged()
     if not staged:
         rprint("[yellow]Nothing to verify[/yellow]")
-        rprint("  Create a claim first: truthgit claim \"...\"")
+        rprint('  Create a claim first: truthgit claim "..."')
         raise typer.Exit(0)
 
     rprint(f"[bold]Verifying {len(staged)} claim(s)...[/bold]\n")
@@ -264,10 +263,12 @@ def cat_object(
     for obj_type in ObjectType:
         for obj in repo.iter_objects(obj_type):
             if obj.hash.startswith(hash_prefix):
-                rprint(Panel.fit(
-                    f"[bold]{obj_type.value.upper()}[/bold] {obj.short_hash}",
-                    border_style="blue",
-                ))
+                rprint(
+                    Panel.fit(
+                        f"[bold]{obj_type.value.upper()}[/bold] {obj.short_hash}",
+                        border_style="blue",
+                    )
+                )
                 rprint(obj.serialize())
                 return
 

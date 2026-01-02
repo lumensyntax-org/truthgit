@@ -76,6 +76,7 @@ class TestObjects:
         )
         serialized = claim.serialize()
         from truthgit.objects import TruthObject
+
         deserialized = TruthObject.deserialize(serialized)
         assert deserialized.hash == claim.hash
 
@@ -84,29 +85,35 @@ class TestConsensus:
     """Test consensus calculation."""
 
     def test_majority_consensus(self):
-        result = calculate_consensus({
-            "A": 0.8,
-            "B": 0.7,
-            "C": 0.75,
-        })
+        result = calculate_consensus(
+            {
+                "A": 0.8,
+                "B": 0.7,
+                "C": 0.75,
+            }
+        )
         assert result.passed
         assert result.consensus_type == ConsensusType.SUPERMAJORITY
 
     def test_failed_consensus(self):
-        result = calculate_consensus({
-            "A": 0.3,
-            "B": 0.4,
-            "C": 0.5,
-        })
+        result = calculate_consensus(
+            {
+                "A": 0.3,
+                "B": 0.4,
+                "C": 0.5,
+            }
+        )
         assert not result.passed
         assert result.consensus_type == ConsensusType.DISPUTED
 
     def test_unanimous_consensus(self):
-        result = calculate_consensus({
-            "A": 1.0,
-            "B": 1.0,
-            "C": 1.0,
-        })
+        result = calculate_consensus(
+            {
+                "A": 1.0,
+                "B": 1.0,
+                "C": 1.0,
+            }
+        )
         assert result.passed
         assert result.consensus_type == ConsensusType.UNANIMOUS
 
