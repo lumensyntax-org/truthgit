@@ -42,8 +42,15 @@ from .objects import (
     calculate_consensus,
 )
 from .repository import TruthRepository
+from .sync import (
+    DocumentSync,
+    SyncedFile,
+    SyncResult,
+    SyncState,
+    sync_docs,
+)
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __author__ = "TruthGit"
 __license__ = "MIT"
 
@@ -74,4 +81,10 @@ __all__ = [
     "ContradictionSeverity",
     "ExtractionResult",
     "extract_from_text",
+    # Sync
+    "DocumentSync",
+    "SyncedFile",
+    "SyncResult",
+    "SyncState",
+    "sync_docs",
 ]

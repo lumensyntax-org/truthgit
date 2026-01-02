@@ -281,7 +281,13 @@ def validators(
     local: bool = typer.Option(False, "--local", "-l", help="Show only local"),
 ):
     """Show available validators."""
-    from .validators import ClaudeValidator, GeminiValidator, GPTValidator, OllamaValidator
+    from .validators import (
+        ClaudeValidator,
+        GeminiValidator,
+        GPTValidator,
+        HuggingFaceValidator,
+        OllamaValidator,
+    )
 
     table = Table(title="Available Validators")
     table.add_column("Name")
@@ -299,6 +305,7 @@ def validators(
             ("CLAUDE", ClaudeValidator),
             ("GPT", GPTValidator),
             ("GEMINI", GeminiValidator),
+            ("HUGGINGFACE", HuggingFaceValidator),
         ]:
             v = validator_cls()
             status = "[green]Ready[/green]" if v.is_available() else "[dim]No API key[/dim]"
@@ -310,7 +317,7 @@ def validators(
     rprint("  1. Install Ollama: https://ollama.ai")
     rprint("  2. Pull a model: ollama pull llama3")
     rprint("\n[bold]Cloud setup:[/bold] (optional)")
-    rprint("  Set environment variables: ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY")
+    rprint("  ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, HF_TOKEN")
 
 
 # =============================================================================
@@ -649,6 +656,205 @@ def graph(
 
             if len(edges) > 10:
                 rprint(f"  ... and {len(edges) - 10} more")
+
+
+# =============================================================================
+# DOCUMENTATION SYNC COMMANDS
+# =============================================================================
+
+
+@app.command()
+def sync(
+    paths: list[str] = typer.Argument(None, help="Paths to sync (dirs or files)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force re-sync all"),
+    verify: bool = typer.Option(False, "--verify", "-v", help="Auto-verify claims"),
+    watch: bool = typer.Option(False, "--watch", "-w", help="Watch for changes"),
+    local: bool = typer.Option(True, "--local", "-l", help="Use local LLM"),
+    interval: float = typer.Option(2.0, "--interval", "-i", help="Watch interval"),
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """Sync documentation with TruthGit."""
+    from .sync import DocumentSync
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository. Run: truthgit init")
+        raise typer.Exit(1)
+
+    doc_sync = DocumentSync(repo, use_local=local)
+
+    # If no paths, use previously watched or current dir
+    if not paths:
+        if doc_sync.state.watch_paths:
+            paths = doc_sync.state.watch_paths
+            rprint(f"[dim]Using saved watch paths: {paths}[/dim]\n")
+        else:
+            paths = ["."]
+            rprint("[dim]No paths specified, using current directory[/dim]\n")
+
+    if watch:
+        # Watch mode
+        rprint(f"[bold]Watching {len(paths)} path(s) for changes...[/bold]")
+        rprint("[dim]Press Ctrl+C to stop[/dim]\n")
+
+        def on_change(result):
+            rprint(
+                f"[green]✓[/green] Synced: {result.files_new} new, "
+                f"{result.files_changed} changed, "
+                f"{result.claims_extracted} claims extracted"
+            )
+            if result.errors:
+                for err in result.errors:
+                    rprint(f"  [red]Error:[/red] {err}")
+
+        try:
+            doc_sync.watch(
+                paths=paths,
+                interval=interval,
+                auto_verify=verify,
+                on_change=on_change,
+            )
+        except KeyboardInterrupt:
+            rprint("\n[dim]Stopped watching[/dim]")
+    else:
+        # One-time sync
+        rprint(f"[bold]Syncing {len(paths)} path(s)...[/bold]\n")
+
+        def on_progress(msg, current, total):
+            rprint(f"  [{current}/{total}] {msg}")
+
+        result = doc_sync.sync(
+            paths=paths,
+            force=force,
+            auto_verify=verify,
+            on_progress=on_progress,
+        )
+
+        # Summary
+        rprint("\n[green]✓[/green] Sync complete:")
+        rprint(f"  Files scanned:  {result.files_scanned}")
+        rprint(f"  New files:      {result.files_new}")
+        rprint(f"  Changed files:  {result.files_changed}")
+        rprint(f"  Deleted files:  {result.files_deleted}")
+        rprint(f"  Claims extracted: {result.claims_extracted}")
+
+        if result.errors:
+            rprint(f"\n[yellow]Errors ({len(result.errors)}):[/yellow]")
+            for err in result.errors[:5]:
+                rprint(f"  • {err}")
+            if len(result.errors) > 5:
+                rprint(f"  ... and {len(result.errors) - 5} more")
+
+        if result.claims_extracted > 0:
+            rprint("\n[dim]Run [bold]truthgit verify[/bold] to validate claims[/dim]")
+
+
+@app.command("sync-status")
+def sync_status(
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """Show documentation sync status."""
+    from .sync import DocumentSync
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository")
+        raise typer.Exit(1)
+
+    doc_sync = DocumentSync(repo)
+    st = doc_sync.status()
+
+    rprint(Panel.fit("[bold]Sync Status[/bold]", border_style="blue"))
+
+    if st["last_full_sync"]:
+        rprint(f"\n[green]Last sync:[/green] {st['last_full_sync'][:19]}")
+    else:
+        rprint("\n[yellow]Never synced[/yellow]")
+
+    rprint(f"[blue]Files tracked:[/blue] {st['files_tracked']}")
+    rprint(f"[blue]Total claims:[/blue] {st['total_claims']}")
+
+    if st["watch_paths"]:
+        rprint("\n[bold]Watch paths:[/bold]")
+        for p in st["watch_paths"]:
+            rprint(f"  • {p}")
+
+    if st["domains"]:
+        rprint("\n[bold]Domains:[/bold]")
+        for d in st["domains"]:
+            rprint(f"  • {d}")
+
+
+@app.command("sync-diff")
+def sync_diff(
+    paths: list[str] = typer.Argument(None, help="Paths to check"),
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """Show what would change on next sync."""
+    from .sync import DocumentSync
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository")
+        raise typer.Exit(1)
+
+    doc_sync = DocumentSync(repo)
+
+    if not paths:
+        paths = doc_sync.state.watch_paths or ["."]
+
+    diff = doc_sync.diff(paths)
+
+    if not any([diff["new"], diff["changed"], diff["deleted"]]):
+        rprint("[green]✓[/green] Everything up to date")
+        return
+
+    if diff["new"]:
+        rprint(f"\n[green]New files ({len(diff['new'])}):[/green]")
+        for f in diff["new"][:10]:
+            rprint(f"  + {f}")
+        if len(diff["new"]) > 10:
+            rprint(f"  ... and {len(diff['new']) - 10} more")
+
+    if diff["changed"]:
+        rprint(f"\n[yellow]Changed files ({len(diff['changed'])}):[/yellow]")
+        for f in diff["changed"][:10]:
+            rprint(f"  ~ {f}")
+        if len(diff["changed"]) > 10:
+            rprint(f"  ... and {len(diff['changed']) - 10} more")
+
+    if diff["deleted"]:
+        rprint(f"\n[red]Deleted files ({len(diff['deleted'])}):[/red]")
+        for f in diff["deleted"][:10]:
+            rprint(f"  - {f}")
+        if len(diff["deleted"]) > 10:
+            rprint(f"  ... and {len(diff['deleted']) - 10} more")
+
+    rprint("\n[dim]Run [bold]truthgit sync[/bold] to apply changes[/dim]")
+
+
+@app.command("sync-domain")
+def sync_domain(
+    pattern: str = typer.Argument(..., help="Path pattern to match"),
+    domain: str = typer.Argument(..., help="Domain to assign"),
+    path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
+):
+    """Set domain mapping for paths matching a pattern."""
+    from .sync import DocumentSync
+
+    repo = get_repo(path)
+
+    if not repo.is_initialized():
+        rprint("[red]✗[/red] Not a truth repository")
+        raise typer.Exit(1)
+
+    doc_sync = DocumentSync(repo)
+    doc_sync.set_domain_mapping(pattern, domain)
+
+    rprint(f"[green]✓[/green] Set mapping: '{pattern}' → domain '{domain}'")
 
 
 if __name__ == "__main__":

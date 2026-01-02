@@ -380,6 +380,207 @@ Domain: {domain}"""
 
 
 # =============================================================================
+# HUGGING FACE VALIDATOR
+# =============================================================================
+
+
+class HuggingFaceValidator(Validator):
+    """
+    Validator using Hugging Face models.
+
+    Supports:
+    - Inference API (cloud, requires HF_TOKEN)
+    - Local transformers (requires transformers library)
+
+    Models: meta-llama/Llama-3-8b-hf, mistralai/Mistral-7B-Instruct-v0.2, etc.
+    """
+
+    PROMPT = """Analyze this claim for accuracy. Respond with JSON only:
+{{"confidence": <0-1>, "reasoning": "<brief explanation>"}}
+
+Claim: {claim}
+Domain: {domain}"""
+
+    def __init__(
+        self,
+        model: str = "meta-llama/Llama-3.2-3B-Instruct",
+        use_api: bool = True,
+    ):
+        """
+        Initialize HuggingFace validator.
+
+        Args:
+            model: Model ID from Hugging Face Hub
+            use_api: Use Inference API (True) or local transformers (False)
+        """
+        self.model = model
+        self.use_api = use_api
+        self.api_key = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
+        self._name = f"HF:{model.split('/')[-1].upper()}"
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def is_available(self) -> bool:
+        if self.use_api:
+            return bool(self.api_key)
+        else:
+            try:
+                import transformers  # noqa: F401
+
+                return True
+            except ImportError:
+                return False
+
+    def validate(self, claim: str, domain: str = "general") -> ValidationResult:
+        if self.use_api:
+            return self._validate_api(claim, domain)
+        else:
+            return self._validate_local(claim, domain)
+
+    def _validate_api(self, claim: str, domain: str) -> ValidationResult:
+        """Validate using Hugging Face Inference API."""
+        if not self.api_key:
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=0,
+                reasoning="",
+                error="HF_TOKEN not set",
+            )
+
+        try:
+            import httpx
+
+            prompt = self.PROMPT.format(claim=claim, domain=domain)
+
+            response = httpx.post(
+                f"https://api-inference.huggingface.co/models/{self.model}",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={
+                    "inputs": prompt,
+                    "parameters": {
+                        "max_new_tokens": 256,
+                        "return_full_text": False,
+                    },
+                },
+                timeout=60,
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                text = result[0].get("generated_text", "{}")
+            else:
+                text = "{}"
+
+            # Parse JSON response
+            try:
+                # Try to extract JSON from response
+                import re
+
+                json_match = re.search(r"\{.*\}", text, re.DOTALL)
+                if json_match:
+                    parsed = json.loads(json_match.group())
+                    confidence = float(parsed.get("confidence", 0.5))
+                    reasoning = parsed.get("reasoning", "No reasoning")
+                else:
+                    confidence = 0.5
+                    reasoning = text[:200] if text else "Could not parse"
+            except json.JSONDecodeError:
+                confidence = 0.5
+                reasoning = text[:200] if text else "Could not parse"
+
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=min(1.0, max(0.0, confidence)),
+                reasoning=reasoning,
+                model=self.model,
+            )
+
+        except ImportError:
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=0,
+                reasoning="",
+                error="httpx not installed. Run: pip install httpx",
+            )
+        except Exception as e:
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=0,
+                reasoning="",
+                error=str(e),
+            )
+
+    def _validate_local(self, claim: str, domain: str) -> ValidationResult:
+        """Validate using local transformers."""
+        try:
+            from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+            prompt = self.PROMPT.format(claim=claim, domain=domain)
+
+            # Load model and tokenizer
+            tokenizer = AutoTokenizer.from_pretrained(self.model)
+            model = AutoModelForCausalLM.from_pretrained(
+                self.model,
+                device_map="auto",
+                torch_dtype="auto",
+            )
+
+            pipe = pipeline(
+                "text-generation",
+                model=model,
+                tokenizer=tokenizer,
+                max_new_tokens=256,
+            )
+
+            result = pipe(prompt)
+            text = result[0]["generated_text"]
+
+            # Remove the prompt from output
+            text = text.replace(prompt, "").strip()
+
+            # Parse JSON
+            try:
+                import re
+
+                json_match = re.search(r"\{.*\}", text, re.DOTALL)
+                if json_match:
+                    parsed = json.loads(json_match.group())
+                    confidence = float(parsed.get("confidence", 0.5))
+                    reasoning = parsed.get("reasoning", "No reasoning")
+                else:
+                    confidence = 0.5
+                    reasoning = text[:200]
+            except json.JSONDecodeError:
+                confidence = 0.5
+                reasoning = text[:200]
+
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=min(1.0, max(0.0, confidence)),
+                reasoning=reasoning,
+                model=self.model,
+            )
+
+        except ImportError:
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=0,
+                reasoning="",
+                error="transformers not installed. Run: pip install transformers",
+            )
+        except Exception as e:
+            return ValidationResult(
+                validator_name=self.name,
+                confidence=0,
+                reasoning="",
+                error=str(e),
+            )
+
+
+# =============================================================================
 # HUMAN VALIDATOR
 # =============================================================================
 
@@ -457,7 +658,12 @@ def get_default_validators(local_only: bool = False) -> list[Validator]:
                     break
     else:
         # Add cloud validators if available
-        cloud_validators = [ClaudeValidator(), GPTValidator(), GeminiValidator()]
+        cloud_validators = [
+            ClaudeValidator(),
+            GPTValidator(),
+            GeminiValidator(),
+            HuggingFaceValidator(),  # HuggingFace Inference API
+        ]
         for v in cloud_validators:
             if v.is_available():
                 validators.append(v)

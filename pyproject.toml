@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "truthgit"
-version = "0.1.0"
+version = "0.3.0"
 description = "Version control for verified truth"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -45,9 +45,15 @@ cloud = [
     "openai>=1.0.0",
     "google-generativeai>=0.3.0",
 ]
+# Hugging Face
+huggingface = [
+    "transformers>=4.30.0",
+    "torch>=2.0.0",
+    "accelerate>=0.20.0",
+]
 # All providers
 all = [
-    "truthgit[local,cloud]",
+    "truthgit[local,cloud,huggingface]",
 ]
 # Development
 dev = [
