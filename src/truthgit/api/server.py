@@ -259,7 +259,14 @@ async def verify_claim(request: VerifyRequest):
 
         if len(verifier_results) < 2:
             return create_response(
-                error="Verification failed - insufficient validators available",
+                data={
+                    "passed": False,
+                    "consensus": 0.0,
+                    "validators": validator_details,  # Show validator errors for debugging
+                    "claimHash": claim.hash[:8],
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                },
+                error=f"Verification failed - only {len(verifier_results)} validators succeeded (need 2)",
                 start_time=start_time,
             )
 
