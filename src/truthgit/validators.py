@@ -1,6 +1,6 @@
 """
 TruthGit Validators - Pluggable verification system.
-Version: 2026.01.03.1
+Version: 2026.01.03.2
 
 Supports:
 - Local: Ollama (llama3, mistral, phi3, etc.)
@@ -225,20 +225,31 @@ Domain: {domain}"""
 
             text = response.content[0].text
 
-            # Try to parse JSON from response (may have extra text around it)
+            # Parse JSON response with robust error handling
+            parsed = {}
             try:
                 parsed = json.loads(text)
             except json.JSONDecodeError:
-                # Try to extract JSON from text
+                # Try to extract JSON from text using regex
                 import re
-                json_match = re.search(r'\{[^}]+\}', text, re.DOTALL)
+                # Match JSON-like structure (handles simple cases)
+                json_match = re.search(r'\{[^{}]*"confidence"[^{}]*\}', text, re.DOTALL)
                 if json_match:
-                    parsed = json.loads(json_match.group())
-                else:
-                    parsed = {}
+                    try:
+                        parsed = json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        pass  # Keep parsed as empty dict
 
-            confidence = float(parsed.get("confidence", 0.5))
-            reasoning = parsed.get("reasoning", text[:200] if text else "No reasoning")
+            # Safely extract values with defaults
+            confidence = 0.5
+            reasoning = text[:200] if text else "No reasoning"
+            try:
+                if "confidence" in parsed:
+                    confidence = float(parsed["confidence"])
+                if "reasoning" in parsed:
+                    reasoning = str(parsed["reasoning"])
+            except (ValueError, TypeError):
+                pass  # Keep defaults
 
             return ValidationResult(
                 validator_name=self.name,
