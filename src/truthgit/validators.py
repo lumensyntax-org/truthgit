@@ -1,6 +1,6 @@
 """
 TruthGit Validators - Pluggable verification system.
-Version: 2026.01.03.3
+Version: 2026.01.03.4
 
 Supports:
 - Local: Ollama (llama3, mistral, phi3, etc.)
