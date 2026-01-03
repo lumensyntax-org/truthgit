@@ -267,11 +267,16 @@ Domain: {domain}"""
                 error="anthropic not installed. Run: pip install anthropic",
             )
         except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            # Get the last few lines to identify where error occurred
+            tb_lines = [l.strip() for l in tb.split('\n') if l.strip()]
+            error_location = tb_lines[-2] if len(tb_lines) >= 2 else "unknown"
             return ValidationResult(
                 validator_name=self.name,
                 confidence=0,
-                reasoning="",
-                error=str(e),
+                reasoning=f"[CLAUDE_ERR] at: {error_location[:80]}",
+                error=f"{type(e).__name__}: {str(e)[:60]}",
             )
 
 
