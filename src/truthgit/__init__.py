@@ -90,7 +90,7 @@ from .validators import (
     validate_claim,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 __author__ = "TruthGit"
 __license__ = "MIT"
 
