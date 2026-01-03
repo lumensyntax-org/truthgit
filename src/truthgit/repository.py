@@ -365,6 +365,9 @@ class TruthRepository:
         verifier_results: dict[str, tuple[float, str]],
         trigger: str = "manual",
         session_id: str = "",
+        use_ontological: bool = True,
+        claim_content: str = "",
+        claim_domain: str = "general",
     ) -> Verification | None:
         """
         Verificar los claims stageados y crear un commit.
@@ -373,6 +376,9 @@ class TruthRepository:
             verifier_results: {"CLAUDE": (0.85, "reasoning"), ...}
             trigger: Qué disparó la verificación
             session_id: ID de sesión (opcional)
+            use_ontological: Use ontological consensus (default True)
+            claim_content: Claim text for ontological analysis
+            claim_domain: Domain for ontological analysis
 
         Returns:
             Verification creada o None si no hay nada stageado
@@ -417,7 +423,21 @@ class TruthRepository:
         # Calcular consenso
         config = self._read_config()
         threshold = config.get("consensus_threshold", 0.66)
+
+        # Legacy consensus (always calculated for backwards compat)
         consensus = calculate_consensus(confidences, threshold)
+
+        # Ontological consensus (v0.5.0+)
+        ontological_consensus = None
+        if use_ontological:
+            from .ontological_classifier import calculate_ontological_consensus
+
+            ontological_consensus = calculate_ontological_consensus(
+                claim=claim_content,
+                validator_results=verifier_results,
+                threshold=threshold,
+                domain=claim_domain,
+            )
 
         # Obtener parent (última verification)
         parent_hash = self.get_head()
@@ -430,6 +450,7 @@ class TruthRepository:
             consensus=consensus,
             trigger=trigger,
             session_id=session_id,
+            ontological_consensus=ontological_consensus,
         )
         verification_hash = self.store(verification)
 
@@ -437,7 +458,23 @@ class TruthRepository:
         for verifier in verifiers:
             self.set_ref(f"perspectives/{verifier}", verification_hash)
 
-        if consensus.passed:
+        # Determine if we should update consensus/main
+        # With ontological consensus:
+        #   - PASSED: update (consensus achieved)
+        #   - UNRESOLVABLE (MYSTERY): update (preserved as data)
+        #   - PENDING_MEDIATION (GAP): do NOT update (waiting for human)
+        #   - FAILED: do NOT update
+        should_update_consensus = False
+        if ontological_consensus:
+            from .ontological_classifier import ConsensusStatus
+            should_update_consensus = ontological_consensus.status in (
+                ConsensusStatus.PASSED,
+                ConsensusStatus.UNRESOLVABLE,  # MYSTERY is valuable data
+            )
+        else:
+            should_update_consensus = consensus.passed
+
+        if should_update_consensus:
             self.set_ref("consensus/main", verification_hash)
 
         # Limpiar staging

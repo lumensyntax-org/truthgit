@@ -68,7 +68,29 @@ from .validators import (
     validate_claim,
 )
 
-__version__ = "0.4.0"
+# Ontological Classification (v0.5.0)
+from .fallacy_detector import (
+    FallacyCategory,
+    FallacyMatch,
+    FallacyResult,
+    detect_fallacies,
+)
+from .hypothesis_tester import (
+    EpistemicStatus,
+    HypothesisResult,
+    HypothesisType,
+    test_hypothesis,
+)
+from .ontological_classifier import (
+    ConsensusStatus,
+    DisagreementAnalysis,
+    DisagreementType,
+    OntologicalConsensus,
+    calculate_ontological_consensus,
+    classify_disagreement,
+)
+
+__version__ = "0.5.0"
 __author__ = "TruthGit"
 __license__ = "MIT"
 
@@ -121,4 +143,21 @@ __all__ = [
     "ProofCertificate",
     "ProofManager",
     "verify_proof_standalone",
+    # Ontological Classification
+    "DisagreementType",
+    "ConsensusStatus",
+    "OntologicalConsensus",
+    "DisagreementAnalysis",
+    "classify_disagreement",
+    "calculate_ontological_consensus",
+    # Fallacy Detection
+    "FallacyCategory",
+    "FallacyMatch",
+    "FallacyResult",
+    "detect_fallacies",
+    # Hypothesis Testing
+    "HypothesisType",
+    "EpistemicStatus",
+    "HypothesisResult",
+    "test_hypothesis",
 ]

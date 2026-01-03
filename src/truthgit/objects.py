@@ -522,6 +522,7 @@ class Verification(TruthObject):
     - Parent (verification anterior)
     - Votos de cada verificador
     - Resultado del consenso
+    - Ontological consensus (v0.5.0+): understands NATURE of disagreement
     """
 
     context_hash: str
@@ -532,6 +533,8 @@ class Verification(TruthObject):
     session_id: str = ""
     duration_ms: int = 0
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    # v0.5.0: Ontological consensus (optional for backward compat during transition)
+    ontological_consensus: Any | None = None  # OntologicalConsensus from ontological_classifier
 
     @property
     def object_type(self) -> ObjectType:
@@ -575,6 +578,23 @@ class Verification(TruthObject):
                 "duration_ms": self.duration_ms,
                 "timestamp": self.timestamp,
             },
+            # v0.5.0: Ontological consensus
+            "ontological_consensus": self._serialize_ontological() if self.ontological_consensus else None,
+        }
+
+    def _serialize_ontological(self) -> dict | None:
+        """Serialize ontological consensus to dict."""
+        if not self.ontological_consensus:
+            return None
+        oc = self.ontological_consensus
+        return {
+            "status": oc.status.value if hasattr(oc.status, 'value') else str(oc.status),
+            "value": oc.value,
+            "threshold": oc.threshold,
+            "disagreement_type": oc.disagreement_type.value if oc.disagreement_type else None,
+            "preserved_positions": oc.preserved_positions,
+            "mediation_context": oc.mediation_context,
+            "excluded_validators": oc.excluded_validators,
         }
 
     @classmethod
@@ -603,6 +623,25 @@ class Verification(TruthObject):
 
         metadata = data.get("metadata", {})
 
+        # v0.5.0: Deserialize ontological consensus if present
+        ontological = None
+        oc_data = data.get("ontological_consensus")
+        if oc_data:
+            from .ontological_classifier import (
+                ConsensusStatus,
+                DisagreementType,
+                OntologicalConsensus,
+            )
+            ontological = OntologicalConsensus(
+                status=ConsensusStatus(oc_data["status"]),
+                value=oc_data["value"],
+                threshold=oc_data["threshold"],
+                disagreement_type=DisagreementType(oc_data["disagreement_type"]) if oc_data.get("disagreement_type") else None,
+                preserved_positions=oc_data.get("preserved_positions"),
+                mediation_context=oc_data.get("mediation_context"),
+                excluded_validators=oc_data.get("excluded_validators"),
+            )
+
         return cls(
             context_hash=data["context"],
             parent_hash=data.get("parent"),
@@ -612,6 +651,7 @@ class Verification(TruthObject):
             session_id=metadata.get("session_id", ""),
             duration_ms=metadata.get("duration_ms", 0),
             timestamp=metadata.get("timestamp", ""),
+            ontological_consensus=ontological,
         )
 
 

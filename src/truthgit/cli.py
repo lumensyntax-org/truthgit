@@ -16,7 +16,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from . import TruthRepository, __version__
-from .objects import ObjectType
+from .objects import ObjectType, Verification
+from .ontological_classifier import ConsensusStatus, DisagreementType
 
 app = typer.Typer(
     name="truthgit",
@@ -29,6 +30,81 @@ console = Console()
 def get_repo(path: str = ".truth") -> TruthRepository:
     """Get repository instance."""
     return TruthRepository(path)
+
+
+def _display_verification_result(verification: Verification, simple_mode: bool = False) -> None:
+    """Display verification result with ontological awareness."""
+    consensus = verification.consensus
+    ontological = getattr(verification, 'ontological_consensus', None)
+
+    # Simple mode or no ontological data: use legacy display
+    if simple_mode or ontological is None:
+        status = "[green]✓ PASSED[/green]" if consensus.passed else "[red]✗ FAILED[/red]"
+        rprint(f"\n{status} Consensus: {consensus.value:.0%}")
+        rprint(f"Verification: [bold]{verification.short_hash}[/bold]")
+        if consensus.passed:
+            rprint("\n[green]Claims verified and stored as truth.[/green]")
+        else:
+            rprint("\n[yellow]Claims did not reach consensus threshold.[/yellow]")
+        return
+
+    # Ontological mode: rich display based on status
+    rprint("")  # Spacing
+
+    if ontological.status == ConsensusStatus.PASSED:
+        rprint("[green]✓ PASSED[/green]")
+        rprint(f"  Consensus: {ontological.value:.0%}")
+        if ontological.excluded_validators:
+            rprint(f"  [dim]Excluded (outlier): {', '.join(ontological.excluded_validators)}[/dim]")
+        rprint(f"  Verification: [bold]{verification.short_hash}[/bold]")
+        rprint("\n[green]Claims verified and stored as truth.[/green]")
+
+    elif ontological.status == ConsensusStatus.FAILED:
+        rprint("[red]✗ FAILED[/red]")
+        rprint(f"  Consensus: {ontological.value:.0%} (threshold: {ontological.threshold:.0%})")
+        rprint(f"  Verification: [bold]{verification.short_hash}[/bold]")
+        rprint("\n[yellow]Claims did not reach consensus threshold.[/yellow]")
+
+    elif ontological.status == ConsensusStatus.UNRESOLVABLE:
+        rprint("[bold magenta]⚡ UNRESOLVABLE[/bold magenta] (MYSTERY)")
+        rprint(f"  This disagreement is [bold]philosophically legitimate[/bold]")
+        rprint(f"  Average confidence: {ontological.value:.0%}")
+        rprint("")
+        rprint("  [bold]Preserved positions:[/bold]")
+        if ontological.preserved_positions:
+            for validator, reasoning in ontological.preserved_positions.items():
+                # Truncate long reasonings
+                short_reasoning = reasoning[:60] + "..." if len(reasoning) > 60 else reasoning
+                rprint(f"    [cyan]{validator}[/cyan]: {short_reasoning}")
+        rprint("")
+        rprint(f"  Verification: [bold]{verification.short_hash}[/bold]")
+        rprint("\n[magenta]→ Disagreement preserved as valuable data[/magenta]")
+
+    elif ontological.status == ConsensusStatus.PENDING_MEDIATION:
+        rprint("[bold yellow]⏳ PENDING_MEDIATION[/bold yellow] (GAP)")
+        rprint(f"  This claim requires [bold]human judgment[/bold]")
+        rprint(f"  Average confidence: {ontological.value:.0%}")
+        rprint("")
+        if ontological.mediation_context:
+            # Show a brief excerpt
+            lines = ontological.mediation_context.split('\n')[:5]
+            for line in lines:
+                rprint(f"  [dim]{line}[/dim]")
+        rprint("")
+        rprint(f"  Verification: [bold]{verification.short_hash}[/bold]")
+        rprint("\n[yellow]→ Run: truthgit mediate {hash} to resolve[/yellow]".format(
+            hash=verification.short_hash
+        ))
+
+    # Show disagreement type if detected
+    if ontological.disagreement_type:
+        dtype = ontological.disagreement_type
+        if dtype == DisagreementType.LOGICAL_ERROR:
+            rprint("\n[dim]Disagreement type: LOGICAL_ERROR (validator issue)[/dim]")
+        elif dtype == DisagreementType.MYSTERY:
+            rprint("\n[dim]Disagreement type: MYSTERY (legitimate unknowable)[/dim]")
+        elif dtype == DisagreementType.GAP:
+            rprint("\n[dim]Disagreement type: GAP (requires human mediation)[/dim]")
 
 
 @app.command()
@@ -127,9 +203,18 @@ def claim(
 @app.command()
 def verify(
     local: bool = typer.Option(False, "--local", "-l", help="Use only local validators (Ollama)"),
+    simple: bool = typer.Option(False, "--simple", "-s", help="Use simple threshold (skip ontological analysis)"),
     path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
 ):
-    """Verify staged claims with multi-validator consensus."""
+    """Verify staged claims with multi-validator consensus.
+
+    By default, uses ontological consensus that understands the NATURE of disagreement:
+    - LOGICAL_ERROR: One validator has a bug (excluded, recalculated)
+    - MYSTERY: Legitimate philosophical disagreement (preserved as data)
+    - GAP: Requires human mediation (escalated)
+
+    Use --simple for legacy threshold-based consensus.
+    """
     repo = get_repo(path)
 
     if not repo.is_initialized():
@@ -190,23 +275,26 @@ def verify(
 
     # Create verification
     if all_results:
+        # Get claim content for ontological analysis
+        claim_content = ""
+        claim_domain = "general"
+        for item in staged:
+            claim_obj = repo.load(ObjectType.CLAIM, item["hash"])
+            if claim_obj:
+                claim_content = claim_obj.content
+                claim_domain = claim_obj.domain
+                break
+
         verification = repo.verify(
             verifier_results=all_results,
             trigger="cli",
+            use_ontological=not simple,
+            claim_content=claim_content,
+            claim_domain=claim_domain,
         )
 
         if verification:
-            consensus = verification.consensus
-
-            # Display result
-            status = "[green]✓ PASSED[/green]" if consensus.passed else "[red]✗ FAILED[/red]"
-            rprint(f"\n{status} Consensus: {consensus.value:.0%}")
-            rprint(f"Verification: [bold]{verification.short_hash}[/bold]")
-
-            if consensus.passed:
-                rprint("\n[green]Claims verified and stored as truth.[/green]")
-            else:
-                rprint("\n[yellow]Claims did not reach consensus threshold.[/yellow]")
+            _display_verification_result(verification, simple)
     else:
         rprint("\n[red]✗[/red] No successful validations")
 
