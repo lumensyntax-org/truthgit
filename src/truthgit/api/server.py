@@ -159,6 +159,10 @@ async def root():
 @app.get("/api/debug/validators")
 async def debug_validators():
     """Debug endpoint to check validator availability."""
+    import truthgit.validators as validators_module
+    validators_version = getattr(validators_module, '__doc__', '')
+    version_line = [l for l in validators_version.split('\n') if 'Version:' in l]
+
     validators_status = []
 
     # Check GCP/Logos6
@@ -194,6 +198,7 @@ async def debug_validators():
     })
 
     return {
+        "validators_module_version": version_line[0] if version_line else "unknown",
         "validators": validators_status,
         "env_check": {
             "GOOGLE_CREDENTIALS_BASE64": "set" if gcp_creds_b64 else "not set",
