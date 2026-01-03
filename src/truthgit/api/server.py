@@ -337,10 +337,13 @@ async def verify_claim(request: VerifyRequest):
                 # Check if validator actually succeeded (no error)
                 if result.error:
                     # Log the error but continue to next validator
+                    # Include both the reasoning (may have traceback) and error
+                    reasoning_info = result.reasoning if result.reasoning else ""
+                    error_info = result.error[:100] if result.error else "Unknown error"
                     validator_details.append({
                         "name": result.validator_name,
                         "confidence": 0,
-                        "reasoning": f"Error: {result.error[:100]}",
+                        "reasoning": f"{reasoning_info} | Error: {error_info}" if reasoning_info else f"Error: {error_info}",
                     })
                     continue
 
