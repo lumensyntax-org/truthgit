@@ -1,6 +1,6 @@
 """
 TruthGit Validators - Pluggable verification system.
-Version: 2026.01.03.6
+Version: 1.0.0
 
 Supports:
 - Local: Ollama (llama3, mistral, phi3, etc.)
@@ -254,7 +254,7 @@ Domain: {domain}"""
             return ValidationResult(
                 validator_name=self.name,
                 confidence=min(1.0, max(0.0, confidence)),
-                reasoning=f"[v3] {reasoning}",  # Version marker
+                reasoning=reasoning,
                 model=self.model,
                 tokens_used=response.usage.input_tokens + response.usage.output_tokens,
             )
@@ -267,20 +267,11 @@ Domain: {domain}"""
                 error="anthropic not installed. Run: pip install anthropic",
             )
         except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            # Find the line with the actual code (look for lines with "File" and get the next line)
-            lines = tb.split('\n')
-            code_line = "unknown"
-            for i, line in enumerate(lines):
-                if 'validators.py' in line and i + 1 < len(lines):
-                    code_line = lines[i + 1].strip()[:80]
-                    break
             return ValidationResult(
                 validator_name=self.name,
                 confidence=0,
-                reasoning=f"[CLAUDE_ERR] code: {code_line}",
-                error=f"{type(e).__name__}: {str(e)[:60]}",
+                reasoning="",
+                error=str(e),
             )
 
 
