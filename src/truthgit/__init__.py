@@ -41,6 +41,11 @@ from .objects import (
     Verification,
     calculate_consensus,
 )
+from .proof import (
+    ProofCertificate,
+    ProofManager,
+    verify_proof_standalone,
+)
 from .repository import TruthRepository
 from .sync import (
     DocumentSync,
@@ -61,11 +66,6 @@ from .validators import (
     Validator,
     get_default_validators,
     validate_claim,
-)
-from .proof import (
-    ProofCertificate,
-    ProofManager,
-    verify_proof_standalone,
 )
 
 __version__ = "0.4.0"

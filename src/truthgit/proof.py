@@ -122,10 +122,9 @@ class ProofManager:
     @property
     def keys_exist(self) -> bool:
         """Check if keypair exists."""
-        return (
-            (self.repo_path / self.PRIVATE_KEY_FILE).exists()
-            and (self.repo_path / self.PUBLIC_KEY_FILE).exists()
-        )
+        return (self.repo_path / self.PRIVATE_KEY_FILE).exists() and (
+            self.repo_path / self.PUBLIC_KEY_FILE
+        ).exists()
 
     def generate_keypair(self, force: bool = False) -> tuple[str, str]:
         """
@@ -307,7 +306,9 @@ class ProofManager:
         if not cert.consensus_passed:
             return True, "Signature valid, but consensus did NOT pass"
 
-        return True, f"Valid proof: {cert.consensus_value:.0%} consensus from {len(cert.validators)} validators"
+        num_validators = len(cert.validators)
+        pct = f"{cert.consensus_value:.0%}"
+        return True, f"Valid proof: {pct} consensus from {num_validators} validators"
 
 
 def verify_proof_standalone(cert_data: str | dict) -> tuple[bool, str, ProofCertificate | None]:

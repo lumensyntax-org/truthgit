@@ -116,7 +116,8 @@ Be objective. If uncertain, reflect that in a lower confidence score."""
             data = response.json()
             models = data.get("models", [])
             model_names = [m.get("name", "").split(":")[0] for m in models]
-            return self.model in model_names or f"{self.model}:latest" in [m.get("name", "") for m in models]
+            full_names = [m.get("name", "") for m in models]
+            return self.model in model_names or f"{self.model}:latest" in full_names
         except Exception:
             return False
 
@@ -232,6 +233,7 @@ Domain: {domain}"""
             except json.JSONDecodeError:
                 # Try to extract JSON from text using regex
                 import re
+
                 # Match JSON-like structure (handles simple cases)
                 json_match = re.search(r'\{[^{}]*"confidence"[^{}]*\}', text, re.DOTALL)
                 if json_match:
@@ -815,8 +817,16 @@ def get_default_validators(local_only: bool = False) -> list[Validator]:
     # Prefer diverse models, fallback to whatever is available
     # NOTE: logos-v1 to logos-v5 are local experiments, not functional validators
     # Only Logos6 (Vertex AI) is production-ready
-    excluded_models = {"logos-v1", "logos-v2", "logos-v3", "logos-v4", "logos-v5",
-                       "logos-minimal", "logos-test-base", "logos-v2-stable"}
+    excluded_models = {
+        "logos-v1",
+        "logos-v2",
+        "logos-v3",
+        "logos-v4",
+        "logos-v5",
+        "logos-minimal",
+        "logos-test-base",
+        "logos-v2-stable",
+    }
     preferred_models = ["llama3", "mistral", "phi3", "hermes3", "nemotron-mini", "qwen2", "gemma"]
     ollama_models = [m for m in preferred_models if m in available_ollama]
     if not ollama_models:

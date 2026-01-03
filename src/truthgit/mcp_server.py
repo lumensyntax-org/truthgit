@@ -60,7 +60,7 @@ def create_server() -> Server:
                         },
                         "domain": {
                             "type": "string",
-                            "description": "Knowledge domain (e.g., 'physics', 'history', 'programming')",
+                            "description": "Knowledge domain (physics, history, etc)",
                             "default": "general",
                         },
                     },
@@ -113,9 +113,7 @@ def create_server() -> Server:
             ),
             Tool(
                 name="truthgit_search",
-                description=(
-                    "Search for verified claims in the repository."
-                ),
+                description=("Search for verified claims in the repository."),
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -185,9 +183,7 @@ def create_server() -> Server:
     return server
 
 
-async def _verify_claim(
-    claim: str, domain: str, repo_path: Path
-) -> list[TextContent]:
+async def _verify_claim(claim: str, domain: str, repo_path: Path) -> list[TextContent]:
     """Verify a claim with multi-validator consensus."""
     try:
         from .repository import TruthRepository
@@ -237,15 +233,6 @@ async def _verify_claim(
         # Create claim in repo
         claim_obj = repo.claim(content=claim, domain=domain, confidence=avg_confidence)
 
-        response = {
-            "claim": claim,
-            "domain": domain,
-            "consensus": round(avg_confidence * 100),
-            "passed": passed,
-            "claim_hash": claim_obj.short_hash,
-            "validators": results,
-        }
-
         status = "PASSED" if passed else "FAILED"
         text = f"""## Claim Verification: {status}
 
@@ -259,7 +246,9 @@ async def _verify_claim(
             if r["error"]:
                 text += f"- **{r['validator']}**: Error - {r['error']}\n"
             else:
-                text += f"- **{r['validator']}**: {round(r['confidence'] * 100)}% - {r['reasoning'][:100]}...\n"
+                pct = round(r["confidence"] * 100)
+                reason = r["reasoning"][:100]
+                text += f"- **{r['validator']}**: {pct}% - {reason}...\n"
 
         text += f"\n**Claim Hash:** `{claim_obj.short_hash}`"
 
@@ -269,9 +258,7 @@ async def _verify_claim(
         return [TextContent(type="text", text=f"Error verifying claim: {e}")]
 
 
-async def _prove_claim(
-    claim: str, domain: str, format: str, repo_path: Path
-) -> list[TextContent]:
+async def _prove_claim(claim: str, domain: str, format: str, repo_path: Path) -> list[TextContent]:
     """Generate proof certificate for a claim."""
     try:
         from .proof import ProofManager
@@ -299,17 +286,16 @@ async def _prove_claim(
 
         successful = [r for r in results if r.success]
         if not successful:
-            return [
-                TextContent(type="text", text="Error: No validators could verify the claim.")
-            ]
+            return [TextContent(type="text", text="Error: No validators could verify the claim.")]
 
         avg_confidence = sum(r.confidence for r in successful) / len(successful)
         passed = avg_confidence >= 0.66
 
         # Create proof
         proof_manager = ProofManager(repo.root)
-        from .hashing import content_hash
         from datetime import datetime
+
+        from .hashing import content_hash
 
         claim_hash = content_hash(claim)
         verification_hash = content_hash(f"{claim_hash}:{datetime.utcnow().isoformat()}")
@@ -362,7 +348,7 @@ async def _verify_proof(certificate: str) -> list[TextContent]:
 **Claim:** {cert.claim_content}
 **Domain:** {cert.claim_domain}
 **Consensus:** {round(cert.consensus_value * 100)}%
-**Validators:** {', '.join(cert.validators)}
+**Validators:** {", ".join(cert.validators)}
 **Timestamp:** {cert.timestamp}
 **Repo ID:** {cert.repo_id}
 
@@ -440,12 +426,8 @@ async def _get_status(repo_path: Path) -> list[TextContent]:
         repo = TruthRepository(str(repo_path))
 
         if not repo.is_initialized():
-            return [
-                TextContent(
-                    type="text",
-                    text="No TruthGit repository found in current directory.\n\nRun `truthgit init` to create one.",
-                )
-            ]
+            msg = "No TruthGit repository found.\n\nRun `truthgit init` first."
+            return [TextContent(type="text", text=msg)]
 
         status = repo.status()
         counts = repo.count_objects()
@@ -453,13 +435,13 @@ async def _get_status(repo_path: Path) -> list[TextContent]:
         text = f"""## TruthGit Status
 
 **Repository:** {repo_path}
-**Staged claims:** {len(status.get('staged', []))}
+**Staged claims:** {len(status.get("staged", []))}
 
 ### Objects:
-- Claims: {counts.get('claim', 0)}
-- Verifications: {counts.get('verification', 0)}
-- Axioms: {counts.get('axiom', 0)}
-- Contexts: {counts.get('context', 0)}
+- Claims: {counts.get("claim", 0)}
+- Verifications: {counts.get("verification", 0)}
+- Axioms: {counts.get("axiom", 0)}
+- Contexts: {counts.get("context", 0)}
 """
 
         if status.get("head"):

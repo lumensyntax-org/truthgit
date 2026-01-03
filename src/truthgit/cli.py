@@ -924,12 +924,12 @@ def prove(
         context_hash = verification.get("context", "")
         context = repo.get_object(ObjectType.CONTEXT, context_hash)
         if not context:
-            rprint(f"[red]✗[/red] Could not find context for verification")
+            rprint("[red]✗[/red] Could not find context for verification")
             raise typer.Exit(1)
 
         claims = context.get("claims", [])
         if not claims:
-            rprint(f"[red]✗[/red] Verification has no claims")
+            rprint("[red]✗[/red] Verification has no claims")
             raise typer.Exit(1)
 
         # Get first claim - claims can be strings or dicts with 'hash' key
@@ -938,7 +938,7 @@ def prove(
 
         claim_obj = repo.get_object(ObjectType.CLAIM, claim_hash)
         if not claim_obj:
-            rprint(f"[red]✗[/red] Could not find claim")
+            rprint("[red]✗[/red] Could not find claim")
             raise typer.Exit(1)
 
         claim_content = claim_obj.get("content", "")
@@ -984,7 +984,8 @@ def prove(
         rprint(Panel.fit("[bold]Proof Certificate[/bold]", border_style="green"))
         rprint(result)
 
-    rprint(f"\n[dim]Verify with: truthgit verify-proof {'<file>' if output else '<certificate>'}[/dim]")
+    hint = "<file>" if output else "<certificate>"
+    rprint(f"\n[dim]Verify with: truthgit verify-proof {hint}[/dim]")
 
 
 @app.command("verify-proof")

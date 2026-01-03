@@ -7,13 +7,24 @@ import base64
 import json
 import os
 import time
-from datetime import datetime
-from pathlib import Path
-from typing import Optional
 from contextlib import asynccontextmanager
+from datetime import datetime
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from truthgit.proof import ProofManager, verify_proof_standalone
+from truthgit.repository import TruthRepository
+from truthgit.validators import (
+    ClaudeValidator,
+    GPTValidator,
+    Logos6Validator,
+    OllamaValidator,
+)
 
 
-def setup_gcp_credentials():
+def setup_gcp_credentials() -> bool:
     """Setup GCP credentials from environment variable for Railway/production."""
     gcp_creds_b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
     if gcp_creds_b64:
@@ -23,17 +34,6 @@ def setup_gcp_credentials():
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
         return True
     return False
-
-
-# NOTE: GCP credentials are now set up in lifespan() to ensure env vars are available
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-
-from truthgit.repository import TruthRepository
-from truthgit.validators import OllamaValidator, ClaudeValidator, GPTValidator, Logos6Validator, get_default_validators
-from truthgit.proof import ProofManager, verify_proof_standalone
 
 
 def load_repo_config(repo: TruthRepository) -> dict:
@@ -62,7 +62,7 @@ class VerifyProofRequest(BaseModel):
 
 class SearchParams(BaseModel):
     query: str = Field(..., min_length=1)
-    domain: Optional[str] = None
+    domain: str | None = None
     limit: int = Field(default=10, ge=1, le=100)
 
 
@@ -76,19 +76,19 @@ class VerificationResponse(BaseModel):
     passed: bool
     consensus: float
     validators: list[ValidatorResult]
-    claimHash: str
+    claimHash: str  # noqa: N815 - API contract uses camelCase
     timestamp: str
 
 
 class ApiResponse(BaseModel):
     success: bool
-    data: Optional[dict] = None
-    error: Optional[str] = None
+    data: dict | None = None
+    error: str | None = None
     meta: dict
 
 
 # Global repository instance
-repo: Optional[TruthRepository] = None
+repo: TruthRepository | None = None
 
 
 @asynccontextmanager
@@ -107,7 +107,7 @@ async def lifespan(app: FastAPI):
     repo = TruthRepository()
     if not repo.is_initialized():
         repo.init()
-    print(f"✅ TruthGit repository initialized")
+    print("✅ TruthGit repository initialized")
 
     yield
     # Cleanup if needed
@@ -116,7 +116,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="TruthGit API",
-    description="Version control for verified truth. Verify claims using multi-validator AI consensus.",
+    description="Version control for verified truth. Multi-validator AI consensus.",
     version="0.4.0",
     lifespan=lifespan,
 )
@@ -160,12 +160,14 @@ async def root():
 async def test_claude():
     """Test Claude API directly and return raw response."""
     import os
+
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         return {"error": "ANTHROPIC_API_KEY not set"}
 
     try:
         import anthropic
+
         client = anthropic.Anthropic(api_key=api_key)
         response = client.messages.create(
             model="claude-3-haiku-20240307",
@@ -173,7 +175,12 @@ async def test_claude():
             messages=[
                 {
                     "role": "user",
-                    "content": 'Analyze this claim for accuracy. Respond with JSON only:\n{"confidence": <0-1>, "reasoning": "<brief explanation>"}\n\nClaim: Water boils at 100 degrees Celsius at sea level\nDomain: physics',
+                    "content": (
+                        "Analyze this claim for accuracy. Respond with JSON only:\n"
+                        '{"confidence": <0-1>, "reasoning": "<brief explanation>"}\n\n'
+                        "Claim: Water boils at 100 degrees Celsius at sea level\n"
+                        "Domain: physics"
+                    ),
                 }
             ],
         )
@@ -185,7 +192,7 @@ async def test_claude():
             "usage": {
                 "input": response.usage.input_tokens,
                 "output": response.usage.output_tokens,
-            }
+            },
         }
     except Exception as e:
         return {
@@ -199,8 +206,9 @@ async def test_claude():
 async def debug_validators():
     """Debug endpoint to check validator availability."""
     import truthgit.validators as validators_module
-    validators_version = getattr(validators_module, '__doc__', '')
-    version_line = [l for l in validators_version.split('\n') if 'Version:' in l]
+
+    validators_version = getattr(validators_module, "__doc__", "")
+    version_line = [line for line in validators_version.split("\n") if "Version:" in line]
 
     validators_status = []
 
@@ -208,33 +216,39 @@ async def debug_validators():
     gcp_creds_b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
     gcp_app_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     logos6 = Logos6Validator()
-    validators_status.append({
-        "name": "LOGOS6",
-        "available": logos6.is_available(),
-        "has_gcp_creds_b64": bool(gcp_creds_b64),
-        "has_gcp_app_creds": bool(gcp_app_creds),
-        "gcp_app_creds_path": gcp_app_creds or "not set",
-    })
+    validators_status.append(
+        {
+            "name": "LOGOS6",
+            "available": logos6.is_available(),
+            "has_gcp_creds_b64": bool(gcp_creds_b64),
+            "has_gcp_app_creds": bool(gcp_app_creds),
+            "gcp_app_creds_path": gcp_app_creds or "not set",
+        }
+    )
 
     # Check Claude
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     claude = ClaudeValidator()
-    validators_status.append({
-        "name": "CLAUDE",
-        "available": claude.is_available(),
-        "has_api_key": bool(anthropic_key),
-        "key_prefix": anthropic_key[:15] + "..." if anthropic_key else "not set",
-    })
+    validators_status.append(
+        {
+            "name": "CLAUDE",
+            "available": claude.is_available(),
+            "has_api_key": bool(anthropic_key),
+            "key_prefix": anthropic_key[:15] + "..." if anthropic_key else "not set",
+        }
+    )
 
     # Check GPT
     openai_key = os.getenv("OPENAI_API_KEY")
     gpt = GPTValidator()
-    validators_status.append({
-        "name": "GPT",
-        "available": gpt.is_available(),
-        "has_api_key": bool(openai_key),
-        "key_prefix": openai_key[:15] + "..." if openai_key else "not set",
-    })
+    validators_status.append(
+        {
+            "name": "GPT",
+            "available": gpt.is_available(),
+            "has_api_key": bool(openai_key),
+            "key_prefix": openai_key[:15] + "..." if openai_key else "not set",
+        }
+    )
 
     return {
         "validators_module_version": version_line[0] if version_line else "unknown",
@@ -244,7 +258,7 @@ async def debug_validators():
             "GOOGLE_APPLICATION_CREDENTIALS": gcp_app_creds or "not set",
             "ANTHROPIC_API_KEY": "set" if anthropic_key else "not set",
             "OPENAI_API_KEY": "set" if openai_key else "not set",
-        }
+        },
     }
 
 
@@ -340,38 +354,55 @@ async def verify_claim(request: VerifyRequest):
                     # Include both the reasoning (may have traceback) and error
                     reasoning_info = result.reasoning if result.reasoning else ""
                     error_info = result.error[:100] if result.error else "Unknown error"
-                    validator_details.append({
-                        "name": result.validator_name,
-                        "confidence": 0,
-                        "reasoning": f"{reasoning_info} | Error: {error_info}" if reasoning_info else f"Error: {error_info}",
-                    })
+                    if reasoning_info:
+                        reasoning = f"{reasoning_info} | Error: {error_info}"
+                    else:
+                        reasoning = f"Error: {error_info}"
+                    validator_details.append(
+                        {
+                            "name": result.validator_name,
+                            "confidence": 0,
+                            "reasoning": reasoning,
+                        }
+                    )
                     continue
 
-                verifier_results[result.validator_name] = (result.confidence, result.reasoning)
-                validator_details.append({
-                    "name": result.validator_name,
-                    "confidence": result.confidence,
-                    "reasoning": result.reasoning[:200] + "..." if len(result.reasoning) > 200 else result.reasoning,
-                })
+                verifier_results[result.validator_name] = (
+                    result.confidence,
+                    result.reasoning,
+                )
+                reasoning = result.reasoning
+                if len(reasoning) > 200:
+                    reasoning = reasoning[:200] + "..."
+                validator_details.append(
+                    {
+                        "name": result.validator_name,
+                        "confidence": result.confidence,
+                        "reasoning": reasoning,
+                    }
+                )
             except Exception as e:
                 # Skip failed validators but log the error
-                validator_details.append({
-                    "name": validator.name,
-                    "confidence": 0,
-                    "reasoning": f"Exception: {str(e)[:100]}",
-                })
+                validator_details.append(
+                    {
+                        "name": validator.name,
+                        "confidence": 0,
+                        "reasoning": f"Exception: {str(e)[:100]}",
+                    }
+                )
                 continue
 
         if len(verifier_results) < 2:
+            num_success = len(verifier_results)
             return create_response(
                 data={
                     "passed": False,
                     "consensus": 0.0,
-                    "validators": validator_details,  # Show validator errors for debugging
+                    "validators": validator_details,
                     "claimHash": claim.hash[:8],
                     "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
-                error=f"Verification failed - only {len(verifier_results)} validators succeeded (need 2)",
+                error=f"Verification failed - {num_success} validators succeeded (need 2)",
                 start_time=start_time,
             )
 
@@ -526,7 +557,7 @@ async def verify_proof_endpoint(request: VerifyProofRequest):
 
 
 @app.get("/api/search")
-async def search_claims(query: str, domain: Optional[str] = None, limit: int = 10):
+async def search_claims(query: str, domain: str | None = None, limit: int = 10):
     """Search for verified claims."""
     start_time = time.time()
 
@@ -538,18 +569,20 @@ async def search_claims(query: str, domain: Optional[str] = None, limit: int = 1
 
         claims = []
         for result in results:
-            claims.append({
-                "hash": result.hash[:8] if hasattr(result, 'hash') else "",
-                "content": result.content if hasattr(result, 'content') else str(result),
-                "domain": result.domain if hasattr(result, 'domain') else "general",
-                "consensus": result.consensus if hasattr(result, 'consensus') else 0,
-                "status": result.status.value if hasattr(result, 'status') else "VERIFIED",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-            })
+            claims.append(
+                {
+                    "hash": result.hash[:8] if hasattr(result, "hash") else "",
+                    "content": result.content if hasattr(result, "content") else str(result),
+                    "domain": result.domain if hasattr(result, "domain") else "general",
+                    "consensus": result.consensus if hasattr(result, "consensus") else 0,
+                    "status": result.status.value if hasattr(result, "status") else "VERIFIED",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                }
+            )
 
         return create_response(data=claims, start_time=start_time)
 
-    except Exception as e:
+    except Exception:
         return create_response(data=[], start_time=start_time)
 
 
@@ -567,24 +600,27 @@ async def get_recent_claims(limit: int = 10):
 
         claims = []
         for result in results:
-            claims.append({
-                "hash": result.get("hash", "")[:8],
-                "content": result.get("content", ""),
-                "domain": result.get("domain", "general"),
-                "consensus": result.get("consensus", 0),
-                "status": result.get("status", "VERIFIED"),
-                "timestamp": result.get("timestamp", datetime.utcnow().isoformat() + "Z"),
-            })
+            claims.append(
+                {
+                    "hash": result.get("hash", "")[:8],
+                    "content": result.get("content", ""),
+                    "domain": result.get("domain", "general"),
+                    "consensus": result.get("consensus", 0),
+                    "status": result.get("status", "VERIFIED"),
+                    "timestamp": result.get("timestamp", datetime.utcnow().isoformat() + "Z"),
+                }
+            )
 
         return create_response(data=claims, start_time=start_time)
 
-    except Exception as e:
+    except Exception:
         return create_response(data=[], start_time=start_time)
 
 
 def run():
     """Run the server."""
     import uvicorn
+
     uvicorn.run(
         "truthgit.api.server:app",
         host="0.0.0.0",
