@@ -1,6 +1,6 @@
 """
 TruthGit Validators - Pluggable verification system.
-Version: 2026.01.03.2
+Version: 2026.01.03.3
 
 Supports:
 - Local: Ollama (llama3, mistral, phi3, etc.)
@@ -254,7 +254,7 @@ Domain: {domain}"""
             return ValidationResult(
                 validator_name=self.name,
                 confidence=min(1.0, max(0.0, confidence)),
-                reasoning=reasoning,
+                reasoning=f"[v3] {reasoning}",  # Version marker
                 model=self.model,
                 tokens_used=response.usage.input_tokens + response.usage.output_tokens,
             )
