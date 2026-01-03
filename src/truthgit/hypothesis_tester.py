@@ -213,7 +213,7 @@ def generate_experiments(hyp_type: HypothesisType) -> list[str]:
     return experiments.get(hyp_type, ["Direct measurement", "Independent replication"])
 
 
-def test_hypothesis(
+def evaluate_hypothesis(
     hypothesis: str, domain: str | None = None, context: str | None = None
 ) -> HypothesisResult:
     """

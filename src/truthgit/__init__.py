@@ -40,7 +40,7 @@ from .hypothesis_tester import (
     EpistemicStatus,
     HypothesisResult,
     HypothesisType,
-    test_hypothesis,
+    evaluate_hypothesis,
 )
 from .objects import (
     Axiom,
@@ -159,5 +159,5 @@ __all__ = [
     "HypothesisType",
     "EpistemicStatus",
     "HypothesisResult",
-    "test_hypothesis",
+    "evaluate_hypothesis",
 ]

@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from .fallacy_detector import detect_fallacies
-from .hypothesis_tester import EpistemicStatus, test_hypothesis
+from .hypothesis_tester import EpistemicStatus, evaluate_hypothesis
 
 
 class DisagreementType(Enum):
@@ -116,7 +116,7 @@ def classify_disagreement(
         DisagreementAnalysis with classification and explanation
     """
     # Analyze the claim for falsifiability
-    hypothesis_result = test_hypothesis(claim, domain=domain)
+    hypothesis_result = evaluate_hypothesis(claim, domain=domain)
 
     # Check for fallacies in positions if provided
     fallacies_a = detect_fallacies(position_a) if position_a else None
@@ -264,7 +264,7 @@ def calculate_ontological_consensus(
     # The key insight: in philosophy, validators agreeing on uncertainty
     # doesn't resolve the underlying unknowability
     if domain and domain.lower() in philosophical_domains:
-        hypothesis_result = test_hypothesis(claim, domain=domain)
+        hypothesis_result = evaluate_hypothesis(claim, domain=domain)
 
         # UNFALSIFIABLE claims → always GAP (requires human mediation)
         if hypothesis_result.status == EpistemicStatus.UNFALSIFIABLE:

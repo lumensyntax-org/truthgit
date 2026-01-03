@@ -135,13 +135,13 @@ When a validator's reasoning contains fallacies, TruthGit classifies the disagre
 TruthGit evaluates claims for falsifiability:
 
 ```python
-from truthgit.hypothesis_tester import test_hypothesis, EpistemicStatus
+from truthgit.hypothesis_tester import evaluate_hypothesis, EpistemicStatus
 
-result = test_hypothesis("Everything happens for a reason")
+result = evaluate_hypothesis("Everything happens for a reason")
 print(result.status)      # EpistemicStatus.UNFALSIFIABLE
 print(result.falsifiable) # False
 
-result = test_hypothesis("Evolution explains biodiversity")
+result = evaluate_hypothesis("Evolution explains biodiversity")
 print(result.status)      # EpistemicStatus.ESTABLISHED
 print(result.falsifiable) # True
 ```
@@ -460,7 +460,7 @@ from truthgit.fallacy_detector import (
 
 # Hypothesis testing
 from truthgit.hypothesis_tester import (
-    test_hypothesis,
+    evaluate_hypothesis,
     EpistemicStatus,  # ESTABLISHED, CONTESTED, SPECULATIVE, FRINGE, UNFALSIFIABLE
     HypothesisType,   # EMPIRICAL, EXISTENTIAL, UNIVERSAL, CAUSAL, MATHEMATICAL
     HypothesisResult,

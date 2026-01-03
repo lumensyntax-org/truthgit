@@ -11,7 +11,7 @@ import pytest
 
 from truthgit.fallacy_detector import detect_fallacies, FallacyCategory
 from truthgit.hypothesis_tester import (
-    test_hypothesis,
+    evaluate_hypothesis,
     EpistemicStatus,
     HypothesisType,
 )
@@ -74,7 +74,7 @@ class TestHypothesisTester:
     def test_unfalsifiable_claim(self):
         """Should identify unfalsifiable claims."""
         claim = "Everything happens for a reason."
-        result = test_hypothesis(claim)
+        result = evaluate_hypothesis(claim)
 
         assert result.status == EpistemicStatus.UNFALSIFIABLE
         assert not result.falsifiable
@@ -82,35 +82,35 @@ class TestHypothesisTester:
     def test_fringe_claim(self):
         """Should identify fringe claims."""
         claim = "The Earth is flat."
-        result = test_hypothesis(claim)
+        result = evaluate_hypothesis(claim)
 
         assert result.status == EpistemicStatus.FRINGE
 
     def test_contested_claim(self):
         """Should identify contested claims."""
         claim = "Free will exists."
-        result = test_hypothesis(claim)
+        result = evaluate_hypothesis(claim)
 
         assert result.status == EpistemicStatus.CONTESTED
 
     def test_established_claim(self):
         """Should identify established science."""
         claim = "Evolution explains biodiversity."
-        result = test_hypothesis(claim)
+        result = evaluate_hypothesis(claim)
 
         assert result.status == EpistemicStatus.ESTABLISHED
 
     def test_causal_hypothesis_type(self):
         """Should correctly classify causal hypotheses."""
         claim = "Smoking causes cancer."
-        result = test_hypothesis(claim)
+        result = evaluate_hypothesis(claim)
 
         assert result.type == HypothesisType.CAUSAL
 
     def test_universal_hypothesis_type(self):
         """Should correctly classify universal hypotheses."""
         claim = "All swans are white."
-        result = test_hypothesis(claim)
+        result = evaluate_hypothesis(claim)
 
         assert result.type == HypothesisType.UNIVERSAL
 
