@@ -467,6 +467,7 @@ class TruthRepository:
         should_update_consensus = False
         if ontological_consensus:
             from .ontological_classifier import ConsensusStatus
+
             should_update_consensus = ontological_consensus.status in (
                 ConsensusStatus.PASSED,
                 ConsensusStatus.UNRESOLVABLE,  # MYSTERY is valuable data

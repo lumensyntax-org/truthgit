@@ -579,7 +579,9 @@ class Verification(TruthObject):
                 "timestamp": self.timestamp,
             },
             # v0.5.0: Ontological consensus
-            "ontological_consensus": self._serialize_ontological() if self.ontological_consensus else None,
+            "ontological_consensus": (
+                self._serialize_ontological() if self.ontological_consensus else None
+            ),
         }
 
     def _serialize_ontological(self) -> dict | None:
@@ -588,7 +590,7 @@ class Verification(TruthObject):
             return None
         oc = self.ontological_consensus
         return {
-            "status": oc.status.value if hasattr(oc.status, 'value') else str(oc.status),
+            "status": oc.status.value if hasattr(oc.status, "value") else str(oc.status),
             "value": oc.value,
             "threshold": oc.threshold,
             "disagreement_type": oc.disagreement_type.value if oc.disagreement_type else None,
@@ -632,11 +634,16 @@ class Verification(TruthObject):
                 DisagreementType,
                 OntologicalConsensus,
             )
+
             ontological = OntologicalConsensus(
                 status=ConsensusStatus(oc_data["status"]),
                 value=oc_data["value"],
                 threshold=oc_data["threshold"],
-                disagreement_type=DisagreementType(oc_data["disagreement_type"]) if oc_data.get("disagreement_type") else None,
+                disagreement_type=(
+                    DisagreementType(oc_data["disagreement_type"])
+                    if oc_data.get("disagreement_type")
+                    else None
+                ),
                 preserved_positions=oc_data.get("preserved_positions"),
                 mediation_context=oc_data.get("mediation_context"),
                 excluded_validators=oc_data.get("excluded_validators"),

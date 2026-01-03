@@ -8,7 +8,6 @@ Ported from TruthSyntax TypeScript implementation.
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple
 
 
 class HypothesisType(Enum):
@@ -22,9 +21,9 @@ class HypothesisType(Enum):
 
 class EpistemicStatus(Enum):
     ESTABLISHED = "ESTABLISHED"  # Scientific consensus
-    CONTESTED = "CONTESTED"      # Active debate, legitimate positions
+    CONTESTED = "CONTESTED"  # Active debate, legitimate positions
     SPECULATIVE = "SPECULATIVE"  # Testable but untested
-    FRINGE = "FRINGE"            # Contradicts consensus
+    FRINGE = "FRINGE"  # Contradicts consensus
     UNFALSIFIABLE = "UNFALSIFIABLE"  # Cannot be tested
 
 
@@ -37,8 +36,8 @@ class HypothesisResult:
     status: EpistemicStatus
     falsifiable: bool
     falsifiability_score: float
-    falsification_criteria: List[str]
-    testable_experiments: List[str]
+    falsification_criteria: list[str]
+    testable_experiments: list[str]
     recommendation: str
 
 
@@ -46,29 +45,64 @@ class HypothesisResult:
 # PATTERN DEFINITIONS
 # =============================================================================
 
-UNFALSIFIABLE_PATTERNS: List[Tuple[re.Pattern, str]] = [
-    (re.compile(r'everything happens for a reason', re.IGNORECASE), "Tautological"),
-    (re.compile(r'too subtle to (measure|detect)', re.IGNORECASE), "Conveniently immune to measurement"),
-    (re.compile(r'beyond (science|measurement)', re.IGNORECASE), "Defined outside empirical reach"),
-    (re.compile(r'you (just |have to )?(believe|have faith)', re.IGNORECASE), "Appeals to faith"),
-    (re.compile(r'works? in mysterious ways', re.IGNORECASE), "Explanatory black box"),
-    (re.compile(r'quantum.*(consciousness|healing|manifestation)', re.IGNORECASE), "Misuse of quantum mechanics"),
+UNFALSIFIABLE_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"everything happens for a reason", re.IGNORECASE), "Tautological"),
+    (
+        re.compile(r"too subtle to (measure|detect)", re.IGNORECASE),
+        "Conveniently immune to measurement",
+    ),
+    (
+        re.compile(r"beyond (science|measurement)", re.IGNORECASE),
+        "Defined outside empirical reach",
+    ),
+    (
+        re.compile(r"you (just |have to )?(believe|have faith)", re.IGNORECASE),
+        "Appeals to faith",
+    ),
+    (
+        re.compile(r"works? in mysterious ways", re.IGNORECASE),
+        "Explanatory black box",
+    ),
+    (
+        re.compile(r"quantum.*(consciousness|healing|manifestation)", re.IGNORECASE),
+        "Misuse of quantum mechanics",
+    ),
 ]
 
 FRINGE_KEYWORDS = [
-    'flat earth', 'earth is flat', 'perpetual motion', 'astrology',
-    'homeopathy', 'crystal healing', 'psychic', 'chemtrails',
-    'lizard people', 'anti-vax', 'moon landing fake'
+    "flat earth",
+    "earth is flat",
+    "perpetual motion",
+    "astrology",
+    "homeopathy",
+    "crystal healing",
+    "psychic",
+    "chemtrails",
+    "lizard people",
+    "anti-vax",
+    "moon landing fake",
 ]
 
 ESTABLISHED_KEYWORDS = [
-    'photosynthesis', 'evolution', 'gravity', 'thermodynamics',
-    'germ theory', 'dna', 'relativity', 'electromagnetic'
+    "photosynthesis",
+    "evolution",
+    "gravity",
+    "thermodynamics",
+    "germ theory",
+    "dna",
+    "relativity",
+    "electromagnetic",
 ]
 
 CONTESTED_KEYWORDS = [
-    'dark matter', 'dark energy', 'consciousness', 'free will',
-    'multiverse', 'string theory', 'panpsychism', 'qualia'
+    "dark matter",
+    "dark energy",
+    "consciousness",
+    "free will",
+    "multiverse",
+    "string theory",
+    "panpsychism",
+    "qualia",
 ]
 
 
@@ -76,19 +110,20 @@ CONTESTED_KEYWORDS = [
 # CLASSIFICATION FUNCTIONS
 # =============================================================================
 
+
 def classify_type(hypothesis: str) -> HypothesisType:
     """Classify the type of hypothesis based on its structure."""
     lower = hypothesis.lower()
 
-    if re.search(r'(all|every|always|never)', lower, re.IGNORECASE):
+    if re.search(r"(all|every|always|never)", lower, re.IGNORECASE):
         return HypothesisType.UNIVERSAL
-    if re.search(r'(causes?|leads? to|results? in)', lower, re.IGNORECASE):
+    if re.search(r"(causes?|leads? to|results? in)", lower, re.IGNORECASE):
         return HypothesisType.CAUSAL
-    if re.search(r'(\d+%|percent|probability|correlation)', lower, re.IGNORECASE):
+    if re.search(r"(\d+%|percent|probability|correlation)", lower, re.IGNORECASE):
         return HypothesisType.STATISTICAL
-    if re.search(r'(exists?|there (is|are))', lower, re.IGNORECASE):
+    if re.search(r"(exists?|there (is|are))", lower, re.IGNORECASE):
         return HypothesisType.EXISTENTIAL
-    if re.search(r'(theory|model|predicts?)', lower, re.IGNORECASE):
+    if re.search(r"(theory|model|predicts?)", lower, re.IGNORECASE):
         return HypothesisType.THEORETICAL
 
     return HypothesisType.EMPIRICAL
@@ -117,7 +152,7 @@ def classify_status(hypothesis: str) -> EpistemicStatus:
     return EpistemicStatus.SPECULATIVE
 
 
-def evaluate_falsifiability(hypothesis: str) -> Tuple[bool, float, List[str]]:
+def evaluate_falsifiability(hypothesis: str) -> tuple[bool, float, list[str]]:
     """
     Evaluate how falsifiable a hypothesis is.
 
@@ -126,7 +161,7 @@ def evaluate_falsifiability(hypothesis: str) -> Tuple[bool, float, List[str]]:
     """
     lower = hypothesis.lower()
     score = 1.0
-    criteria: List[str] = []
+    criteria: list[str] = []
     matched_unfalsifiable = False
 
     # Check for unfalsifiable patterns
@@ -158,36 +193,28 @@ def evaluate_falsifiability(hypothesis: str) -> Tuple[bool, float, List[str]]:
     return (score > 0.5, max(0.0, score), criteria)
 
 
-def generate_experiments(hyp_type: HypothesisType) -> List[str]:
+def generate_experiments(hyp_type: HypothesisType) -> list[str]:
     """Generate suggested experiments based on hypothesis type."""
     experiments = {
         HypothesisType.CAUSAL: [
             "Randomized controlled trial",
             "Natural experiment",
-            "Time-series analysis"
+            "Time-series analysis",
         ],
         HypothesisType.STATISTICAL: [
             "Large-scale observational study",
             "Meta-analysis",
-            "Prospective cohort study"
+            "Prospective cohort study",
         ],
-        HypothesisType.UNIVERSAL: [
-            "Systematic search for counterexamples",
-            "Edge case testing"
-        ],
-        HypothesisType.EXISTENTIAL: [
-            "Targeted search",
-            "Improved detection methods"
-        ],
+        HypothesisType.UNIVERSAL: ["Systematic search for counterexamples", "Edge case testing"],
+        HypothesisType.EXISTENTIAL: ["Targeted search", "Improved detection methods"],
     }
 
     return experiments.get(hyp_type, ["Direct measurement", "Independent replication"])
 
 
 def test_hypothesis(
-    hypothesis: str,
-    domain: Optional[str] = None,
-    context: Optional[str] = None
+    hypothesis: str, domain: str | None = None, context: str | None = None
 ) -> HypothesisResult:
     """
     Evaluate a hypothesis for falsifiability and scientific rigor.
@@ -207,9 +234,13 @@ def test_hypothesis(
 
     # Generate recommendation based on status
     if status == EpistemicStatus.UNFALSIFIABLE:
-        recommendation = "Cannot be scientifically tested. Reformulate to make specific predictions."
+        recommendation = (
+            "Cannot be scientifically tested. Reformulate to make specific predictions."
+        )
     elif status == EpistemicStatus.FRINGE:
-        recommendation = "Contradicts scientific consensus. Extraordinary claims require extraordinary evidence."
+        recommendation = (
+            "Contradicts scientific consensus. Extraordinary claims require extraordinary evidence."
+        )
     elif not falsifiable:
         recommendation = "Has falsifiability issues. Specify what evidence would disprove it."
     elif status == EpistemicStatus.SPECULATIVE:
@@ -227,5 +258,5 @@ def test_hypothesis(
         falsifiability_score=score,
         falsification_criteria=criteria,
         testable_experiments=experiments,
-        recommendation=recommendation
+        recommendation=recommendation,
     )

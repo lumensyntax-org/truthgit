@@ -11,13 +11,12 @@ This is the philosophical core that makes TruthGit different from
 simple voting systems.
 """
 
+import statistics
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
-import statistics
 
 from .fallacy_detector import detect_fallacies
-from .hypothesis_tester import test_hypothesis, EpistemicStatus
+from .hypothesis_tester import EpistemicStatus, test_hypothesis
 
 
 class DisagreementType(Enum):
@@ -64,19 +63,19 @@ class OntologicalConsensus:
     status: ConsensusStatus
     value: float
     threshold: float
-    disagreement_type: Optional[DisagreementType] = None
+    disagreement_type: DisagreementType | None = None
 
     # For MYSTERY: preserve positions as valuable data
-    preserved_positions: Optional[Dict[str, str]] = None
+    preserved_positions: dict[str, str] | None = None
 
     # For GAP: information for human mediator
-    mediation_context: Optional[str] = None
+    mediation_context: str | None = None
 
     # For LOGICAL_ERROR: which validators were excluded
-    excluded_validators: Optional[List[str]] = None
+    excluded_validators: list[str] | None = None
 
     # Original validator results
-    validator_details: Dict[str, Tuple[float, str]] = field(default_factory=dict)
+    validator_details: dict[str, tuple[float, str]] = field(default_factory=dict)
 
     @property
     def passed(self) -> bool:
@@ -90,16 +89,16 @@ class DisagreementAnalysis:
 
     type: DisagreementType
     explanation: str
-    claim_status: Optional[EpistemicStatus] = None
+    claim_status: EpistemicStatus | None = None
     fallacy_count_a: int = 0
     fallacy_count_b: int = 0
 
 
 def classify_disagreement(
     claim: str,
-    position_a: Optional[str] = None,
-    position_b: Optional[str] = None,
-    domain: Optional[str] = None
+    position_a: str | None = None,
+    position_b: str | None = None,
+    domain: str | None = None,
 ) -> DisagreementAnalysis:
     """
     Classify the ontological nature of a disagreement.
@@ -133,34 +132,36 @@ def classify_disagreement(
             explanation="One or both positions contain logical fallacies",
             claim_status=hypothesis_result.status,
             fallacy_count_a=fallacy_count_a,
-            fallacy_count_b=fallacy_count_b
+            fallacy_count_b=fallacy_count_b,
         )
 
     if hypothesis_result.status == EpistemicStatus.UNFALSIFIABLE:
         return DisagreementAnalysis(
             type=DisagreementType.GAP,
-            explanation="The claim is unfalsifiable - disagreement stems from values/interpretation",
-            claim_status=hypothesis_result.status
+            explanation=(
+                "The claim is unfalsifiable - disagreement stems from values/interpretation"
+            ),
+            claim_status=hypothesis_result.status,
         )
 
     if hypothesis_result.status in (EpistemicStatus.CONTESTED, EpistemicStatus.SPECULATIVE):
         return DisagreementAnalysis(
             type=DisagreementType.MYSTERY,
-            explanation="Insufficient evidence to resolve - legitimate positions exist on both sides",
-            claim_status=hypothesis_result.status
+            explanation=(
+                "Insufficient evidence to resolve - legitimate positions exist on both sides"
+            ),
+            claim_status=hypothesis_result.status,
         )
 
     # Default: likely one position contradicts evidence
     return DisagreementAnalysis(
         type=DisagreementType.LOGICAL_ERROR,
         explanation="One position likely contradicts established evidence",
-        claim_status=hypothesis_result.status
+        claim_status=hypothesis_result.status,
     )
 
 
-def identify_outlier(
-    validator_results: Dict[str, Tuple[float, str]]
-) -> Optional[str]:
+def identify_outlier(validator_results: dict[str, tuple[float, str]]) -> str | None:
     """
     Identify the statistical outlier among validators.
 
@@ -185,10 +186,7 @@ def identify_outlier(
     return outlier if max_deviation > 0.3 else None
 
 
-def generate_mediation_brief(
-    claim: str,
-    validator_results: Dict[str, Tuple[float, str]]
-) -> str:
+def generate_mediation_brief(claim: str, validator_results: dict[str, tuple[float, str]]) -> str:
     """Generate a brief for human mediators."""
     lines = [
         "## Mediation Required",
@@ -201,23 +199,25 @@ def generate_mediation_brief(
     for validator, (confidence, reasoning) in validator_results.items():
         lines.append(f"- **{validator}** ({confidence:.0%}): {reasoning[:200]}...")
 
-    lines.extend([
-        "",
-        "**Why Mediation?**",
-        "This disagreement cannot be resolved algorithmically because it involves",
-        "unfalsifiable claims or value-based interpretations.",
-        "",
-        "**Action Required:** Human judgment on which position to accept."
-    ])
+    lines.extend(
+        [
+            "",
+            "**Why Mediation?**",
+            "This disagreement cannot be resolved algorithmically because it involves",
+            "unfalsifiable claims or value-based interpretations.",
+            "",
+            "**Action Required:** Human judgment on which position to accept.",
+        ]
+    )
 
     return "\n".join(lines)
 
 
 def calculate_ontological_consensus(
     claim: str,
-    validator_results: Dict[str, Tuple[float, str]],
+    validator_results: dict[str, tuple[float, str]],
     threshold: float = 0.66,
-    domain: Optional[str] = None
+    domain: str | None = None,
 ) -> OntologicalConsensus:
     """
     Calculate consensus that understands the NATURE of the claim.
@@ -250,7 +250,7 @@ def calculate_ontological_consensus(
             value=0.0,
             threshold=threshold,
             disagreement_type=None,
-            validator_details={}
+            validator_details={},
         )
 
     confidences = [r[0] for r in validator_results.values()]
@@ -258,12 +258,12 @@ def calculate_ontological_consensus(
     mean_confidence = statistics.mean(confidences)
 
     # Domains where claim nature takes precedence over validator agreement
-    PHILOSOPHICAL_DOMAINS = {"philosophy", "ethics", "religion", "metaphysics", "epistemology"}
+    philosophical_domains = {"philosophy", "ethics", "religion", "metaphysics", "epistemology"}
 
     # For philosophical domains, analyze claim nature FIRST
     # The key insight: in philosophy, validators agreeing on uncertainty
     # doesn't resolve the underlying unknowability
-    if domain and domain.lower() in PHILOSOPHICAL_DOMAINS:
+    if domain and domain.lower() in philosophical_domains:
         hypothesis_result = test_hypothesis(claim, domain=domain)
 
         # UNFALSIFIABLE claims → always GAP (requires human mediation)
@@ -274,7 +274,7 @@ def calculate_ontological_consensus(
                 threshold=threshold,
                 disagreement_type=DisagreementType.GAP,
                 mediation_context=generate_mediation_brief(claim, validator_results),
-                validator_details=validator_results
+                validator_details=validator_results,
             )
 
         # CONTESTED/SPECULATIVE claims → always MYSTERY (preserve as data)
@@ -285,7 +285,7 @@ def calculate_ontological_consensus(
                 threshold=threshold,
                 disagreement_type=DisagreementType.MYSTERY,
                 preserved_positions=reasonings,
-                validator_details=validator_results
+                validator_details=validator_results,
             )
 
     # For non-philosophical domains or non-contested claims, use variance-based logic
@@ -305,23 +305,20 @@ def calculate_ontological_consensus(
             value=mean_confidence,
             threshold=threshold,
             disagreement_type=None,
-            validator_details=validator_results
+            validator_details=validator_results,
         )
 
     # HIGH VARIANCE on falsifiable claim → likely LOGICAL_ERROR
     # Get positions for fallacy analysis
-    sorted_validators = sorted(
-        validator_results.items(),
-        key=lambda x: x[1][0]
-    )
+    sorted_validators = sorted(validator_results.items(), key=lambda x: x[1][0])
     lowest = sorted_validators[0]
     highest = sorted_validators[-1]
 
     analysis = classify_disagreement(
         claim=claim,
         position_a=highest[1][1],  # Highest confidence reasoning
-        position_b=lowest[1][1],   # Lowest confidence reasoning
-        domain=domain
+        position_b=lowest[1][1],  # Lowest confidence reasoning
+        domain=domain,
     )
 
     # Handle based on disagreement type
@@ -340,7 +337,7 @@ def calculate_ontological_consensus(
                 threshold=threshold,
                 disagreement_type=DisagreementType.LOGICAL_ERROR,
                 excluded_validators=[outlier],
-                validator_details=validator_results
+                validator_details=validator_results,
             )
         else:
             # No clear outlier, fail consensus
@@ -349,7 +346,7 @@ def calculate_ontological_consensus(
                 value=mean_confidence,
                 threshold=threshold,
                 disagreement_type=DisagreementType.LOGICAL_ERROR,
-                validator_details=validator_results
+                validator_details=validator_results,
             )
 
     elif analysis.type == DisagreementType.MYSTERY:
@@ -360,7 +357,7 @@ def calculate_ontological_consensus(
             threshold=threshold,
             disagreement_type=DisagreementType.MYSTERY,
             preserved_positions=reasonings,  # THIS IS THE VALUE
-            validator_details=validator_results
+            validator_details=validator_results,
         )
 
     elif analysis.type == DisagreementType.GAP:
@@ -371,7 +368,7 @@ def calculate_ontological_consensus(
             threshold=threshold,
             disagreement_type=DisagreementType.GAP,
             mediation_context=generate_mediation_brief(claim, validator_results),
-            validator_details=validator_results
+            validator_details=validator_results,
         )
 
     # Fallback (should not reach here)
@@ -380,5 +377,5 @@ def calculate_ontological_consensus(
         value=mean_confidence,
         threshold=threshold,
         disagreement_type=None,
-        validator_details=validator_results
+        validator_details=validator_results,
     )

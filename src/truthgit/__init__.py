@@ -27,7 +27,21 @@ from .extractor import (
     PatternType,
     extract_from_text,
 )
+
+# Ontological Classification (v0.5.0)
+from .fallacy_detector import (
+    FallacyCategory,
+    FallacyMatch,
+    FallacyResult,
+    detect_fallacies,
+)
 from .hashing import content_hash, short_hash, verify_hash
+from .hypothesis_tester import (
+    EpistemicStatus,
+    HypothesisResult,
+    HypothesisType,
+    test_hypothesis,
+)
 from .objects import (
     Axiom,
     AxiomType,
@@ -40,6 +54,14 @@ from .objects import (
     TruthObject,
     Verification,
     calculate_consensus,
+)
+from .ontological_classifier import (
+    ConsensusStatus,
+    DisagreementAnalysis,
+    DisagreementType,
+    OntologicalConsensus,
+    calculate_ontological_consensus,
+    classify_disagreement,
 )
 from .proof import (
     ProofCertificate,
@@ -66,28 +88,6 @@ from .validators import (
     Validator,
     get_default_validators,
     validate_claim,
-)
-
-# Ontological Classification (v0.5.0)
-from .fallacy_detector import (
-    FallacyCategory,
-    FallacyMatch,
-    FallacyResult,
-    detect_fallacies,
-)
-from .hypothesis_tester import (
-    EpistemicStatus,
-    HypothesisResult,
-    HypothesisType,
-    test_hypothesis,
-)
-from .ontological_classifier import (
-    ConsensusStatus,
-    DisagreementAnalysis,
-    DisagreementType,
-    OntologicalConsensus,
-    calculate_ontological_consensus,
-    classify_disagreement,
 )
 
 __version__ = "0.5.0"

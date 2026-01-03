@@ -35,7 +35,7 @@ def get_repo(path: str = ".truth") -> TruthRepository:
 def _display_verification_result(verification: Verification, simple_mode: bool = False) -> None:
     """Display verification result with ontological awareness."""
     consensus = verification.consensus
-    ontological = getattr(verification, 'ontological_consensus', None)
+    ontological = getattr(verification, "ontological_consensus", None)
 
     # Simple mode or no ontological data: use legacy display
     if simple_mode or ontological is None:
@@ -67,7 +67,7 @@ def _display_verification_result(verification: Verification, simple_mode: bool =
 
     elif ontological.status == ConsensusStatus.UNRESOLVABLE:
         rprint("[bold magenta]⚡ UNRESOLVABLE[/bold magenta] (MYSTERY)")
-        rprint(f"  This disagreement is [bold]philosophically legitimate[/bold]")
+        rprint("  This disagreement is [bold]philosophically legitimate[/bold]")
         rprint(f"  Average confidence: {ontological.value:.0%}")
         rprint("")
         rprint("  [bold]Preserved positions:[/bold]")
@@ -82,19 +82,17 @@ def _display_verification_result(verification: Verification, simple_mode: bool =
 
     elif ontological.status == ConsensusStatus.PENDING_MEDIATION:
         rprint("[bold yellow]⏳ PENDING_MEDIATION[/bold yellow] (GAP)")
-        rprint(f"  This claim requires [bold]human judgment[/bold]")
+        rprint("  This claim requires [bold]human judgment[/bold]")
         rprint(f"  Average confidence: {ontological.value:.0%}")
         rprint("")
         if ontological.mediation_context:
             # Show a brief excerpt
-            lines = ontological.mediation_context.split('\n')[:5]
+            lines = ontological.mediation_context.split("\n")[:5]
             for line in lines:
                 rprint(f"  [dim]{line}[/dim]")
         rprint("")
         rprint(f"  Verification: [bold]{verification.short_hash}[/bold]")
-        rprint("\n[yellow]→ Run: truthgit mediate {hash} to resolve[/yellow]".format(
-            hash=verification.short_hash
-        ))
+        rprint(f"\n[yellow]→ Run: truthgit mediate {verification.short_hash} to resolve[/yellow]")
 
     # Show disagreement type if detected
     if ontological.disagreement_type:
@@ -203,7 +201,9 @@ def claim(
 @app.command()
 def verify(
     local: bool = typer.Option(False, "--local", "-l", help="Use only local validators (Ollama)"),
-    simple: bool = typer.Option(False, "--simple", "-s", help="Use simple threshold (skip ontological analysis)"),
+    simple: bool = typer.Option(
+        False, "--simple", "-s", help="Use simple threshold (skip ontological analysis)"
+    ),
     path: str = typer.Option(".truth", "--path", "-p", help="Repository path"),
 ):
     """Verify staged claims with multi-validator consensus.
