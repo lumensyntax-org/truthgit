@@ -156,6 +156,45 @@ async def root():
     }
 
 
+@app.get("/api/debug/test-claude")
+async def test_claude():
+    """Test Claude API directly and return raw response."""
+    import os
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {"error": "ANTHROPIC_API_KEY not set"}
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=256,
+            messages=[
+                {
+                    "role": "user",
+                    "content": 'Analyze this claim for accuracy. Respond with JSON only:\n{"confidence": <0-1>, "reasoning": "<brief explanation>"}\n\nClaim: Water boils at 100 degrees Celsius at sea level\nDomain: physics',
+                }
+            ],
+        )
+        text = response.content[0].text
+        return {
+            "success": True,
+            "raw_response": text,
+            "model": "claude-3-haiku-20240307",
+            "usage": {
+                "input": response.usage.input_tokens,
+                "output": response.usage.output_tokens,
+            }
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+        }
+
+
 @app.get("/api/debug/validators")
 async def debug_validators():
     """Debug endpoint to check validator availability."""
