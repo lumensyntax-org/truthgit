@@ -1,6 +1,6 @@
 """
 TruthGit Validators - Pluggable verification system.
-Version: 2026.01.03.5
+Version: 2026.01.03.6
 
 Supports:
 - Local: Ollama (llama3, mistral, phi3, etc.)
@@ -183,7 +183,7 @@ class ClaudeValidator(Validator):
     """Validator using Anthropic's Claude API."""
 
     PROMPT = """Analyze this claim for accuracy. Respond with JSON only:
-{"confidence": <0-1>, "reasoning": "<brief explanation>"}
+{{"confidence": <0-1>, "reasoning": "<brief explanation>"}}
 
 Claim: {claim}
 Domain: {domain}"""
@@ -288,7 +288,7 @@ class GPTValidator(Validator):
     """Validator using OpenAI's GPT API."""
 
     PROMPT = """Analyze this claim for accuracy. Respond with JSON only:
-{"confidence": <0-1>, "reasoning": "<brief explanation>"}
+{{"confidence": <0-1>, "reasoning": "<brief explanation>"}}
 
 Claim: {claim}
 Domain: {domain}"""
@@ -360,7 +360,7 @@ class GeminiValidator(Validator):
     """Validator using Google's Gemini API."""
 
     PROMPT = """Analyze this claim for accuracy. Respond with JSON only:
-{"confidence": <0-1>, "reasoning": "<brief explanation>"}
+{{"confidence": <0-1>, "reasoning": "<brief explanation>"}}
 
 Claim: {claim}
 Domain: {domain}"""
