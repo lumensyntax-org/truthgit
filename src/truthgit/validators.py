@@ -1,6 +1,6 @@
 """
 TruthGit Validators - Pluggable verification system.
-Version: 2026.01.03.4
+Version: 2026.01.03.5
 
 Supports:
 - Local: Ollama (llama3, mistral, phi3, etc.)
@@ -269,13 +269,17 @@ Domain: {domain}"""
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
-            # Get the last few lines to identify where error occurred
-            tb_lines = [l.strip() for l in tb.split('\n') if l.strip()]
-            error_location = tb_lines[-2] if len(tb_lines) >= 2 else "unknown"
+            # Find the line with the actual code (look for lines with "File" and get the next line)
+            lines = tb.split('\n')
+            code_line = "unknown"
+            for i, line in enumerate(lines):
+                if 'validators.py' in line and i + 1 < len(lines):
+                    code_line = lines[i + 1].strip()[:80]
+                    break
             return ValidationResult(
                 validator_name=self.name,
                 confidence=0,
-                reasoning=f"[CLAUDE_ERR] at: {error_location[:80]}",
+                reasoning=f"[CLAUDE_ERR] code: {code_line}",
                 error=f"{type(e).__name__}: {str(e)[:60]}",
             )
 
