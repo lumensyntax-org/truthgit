@@ -223,12 +223,26 @@ Domain: {domain}"""
             )
 
             text = response.content[0].text
-            parsed = json.loads(text)
+
+            # Try to parse JSON from response (may have extra text around it)
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                # Try to extract JSON from text
+                import re
+                json_match = re.search(r'\{[^}]+\}', text, re.DOTALL)
+                if json_match:
+                    parsed = json.loads(json_match.group())
+                else:
+                    parsed = {}
+
+            confidence = float(parsed.get("confidence", 0.5))
+            reasoning = parsed.get("reasoning", text[:200] if text else "No reasoning")
 
             return ValidationResult(
                 validator_name=self.name,
-                confidence=float(parsed["confidence"]),
-                reasoning=parsed["reasoning"],
+                confidence=min(1.0, max(0.0, confidence)),
+                reasoning=reasoning,
                 model=self.model,
                 tokens_used=response.usage.input_tokens + response.usage.output_tokens,
             )

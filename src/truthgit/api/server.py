@@ -25,8 +25,7 @@ def setup_gcp_credentials():
     return False
 
 
-# Setup GCP credentials on module load
-setup_gcp_credentials()
+# NOTE: GCP credentials are now set up in lifespan() to ensure env vars are available
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -94,11 +93,22 @@ repo: Optional[TruthRepository] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize repository on startup."""
+    """Initialize repository and credentials on startup."""
     global repo
+
+    # Setup GCP credentials for Vertex AI (Logos6)
+    gcp_setup = setup_gcp_credentials()
+    if gcp_setup:
+        print("✅ GCP credentials configured from GOOGLE_CREDENTIALS_BASE64")
+    else:
+        print("⚠️ GCP credentials not found - Logos6 validator will be unavailable")
+
+    # Initialize TruthGit repository
     repo = TruthRepository()
     if not repo.is_initialized():
         repo.init()
+    print(f"✅ TruthGit repository initialized")
+
     yield
     # Cleanup if needed
 
@@ -143,6 +153,54 @@ async def root():
         "version": "0.4.0",
         "status": "healthy",
         "docs": "/docs",
+    }
+
+
+@app.get("/api/debug/validators")
+async def debug_validators():
+    """Debug endpoint to check validator availability."""
+    validators_status = []
+
+    # Check GCP/Logos6
+    gcp_creds_b64 = os.getenv("GOOGLE_CREDENTIALS_BASE64")
+    gcp_app_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    logos6 = Logos6Validator()
+    validators_status.append({
+        "name": "LOGOS6",
+        "available": logos6.is_available(),
+        "has_gcp_creds_b64": bool(gcp_creds_b64),
+        "has_gcp_app_creds": bool(gcp_app_creds),
+        "gcp_app_creds_path": gcp_app_creds or "not set",
+    })
+
+    # Check Claude
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    claude = ClaudeValidator()
+    validators_status.append({
+        "name": "CLAUDE",
+        "available": claude.is_available(),
+        "has_api_key": bool(anthropic_key),
+        "key_prefix": anthropic_key[:15] + "..." if anthropic_key else "not set",
+    })
+
+    # Check GPT
+    openai_key = os.getenv("OPENAI_API_KEY")
+    gpt = GPTValidator()
+    validators_status.append({
+        "name": "GPT",
+        "available": gpt.is_available(),
+        "has_api_key": bool(openai_key),
+        "key_prefix": openai_key[:15] + "..." if openai_key else "not set",
+    })
+
+    return {
+        "validators": validators_status,
+        "env_check": {
+            "GOOGLE_CREDENTIALS_BASE64": "set" if gcp_creds_b64 else "not set",
+            "GOOGLE_APPLICATION_CREDENTIALS": gcp_app_creds or "not set",
+            "ANTHROPIC_API_KEY": "set" if anthropic_key else "not set",
+            "OPENAI_API_KEY": "set" if openai_key else "not set",
+        }
     }
 
 
